@@ -508,21 +508,40 @@ section.block.collapsed>*:not(h2){display:none}
     }));
     return;
   }
-  if(/^\/fixture\//.test(location.pathname)){var b1=btn('Extraer este partido',function(){run('custom')});b1.style.background='#9A6514';$('cj-b').appendChild(b1)}
-  Object.keys(LG).forEach(function(k){$('cj-b').appendChild(btn('Extraer '+LG[k].n,function(){run(k)}))});
-  async function run(key){
+  if(/^\/fixture\//.test(location.pathname)){var b1=btn('Extraer este partido',function(){run(['custom'])});b1.style.background='#9A6514';$('cj-b').appendChild(b1)}
+  var saved=null;try{saved=JSON.parse(localStorage.getItem('cj-sel')||'null')}catch(e){}
+  var keys=Object.keys(LG),lst=document.createElement('div');
+  lst.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin:4px 0 6px';
+  var cbAll=document.createElement('label');cbAll.style.cssText='grid-column:1/-1;font-weight:600';cbAll.innerHTML='<input type="checkbox" id="cj-all"> Todas';lst.appendChild(cbAll);
+  keys.forEach(function(k){var l=document.createElement('label');l.innerHTML='<input type="checkbox" data-k="'+k+'"'+((saved?saved.indexOf(k)>=0:false)?' checked':'')+'> '+LG[k].n;lst.appendChild(l)});
+  $('cj-b').appendChild(lst);
+  var boxes=function(){return Array.from(lst.querySelectorAll('input[data-k]'))};
+  var sync=function(){var b=boxes();$('cj-all').checked=b.every(function(x){return x.checked});var n=b.filter(function(x){return x.checked}).length;go.textContent=n?'Extraer '+(n===1?'1 liga':n+' ligas'):'Elige al menos una liga';go.disabled=!n;go.style.opacity=n?1:.5};
+  var go=btn('Extraer',function(){var sel=boxes().filter(function(x){return x.checked}).map(function(x){return x.dataset.k});if(!sel.length)return;try{localStorage.setItem('cj-sel',JSON.stringify(sel))}catch(e){}run(sel)});
+  $('cj-b').appendChild(go);
+  $('cj-all').onchange=function(){var v=this.checked;boxes().forEach(function(x){x.checked=v});sync()};
+  lst.addEventListener('change',function(e){if(e.target.dataset.k)sync()});
+  sync();
+  function summary(out){return out.leagueName==='Nations League'||out.league==='unl'?out.fixtures.filter(function(f){return!f.fin}).length+' partidos de la Nations League en '+Object.keys(out.groups||{}).length+' grupos':out.single?out.fixtures[0].h.name+' vs '+out.fixtures[0].a.name+(out.fixtures[0].comp?' ('+out.fixtures[0].comp+')':'')+(out.fixtures[0].fin?' (ya comenzó: la app no lo mostrará)':''):out.leagueName+': '+out.roundWord.toLowerCase()+' '+out.round+(out.round2?' y '+out.round2:'')+', '+out.fixtures.length+' partidos'}
+  async function run(sel){
     $('cj-b').style.display='none';$('cj-o').innerHTML='';$('cj-o').style.display='none';
-    try{
-      var out=await collect(key,+$('cj-n').value,say,$('cj-cl').value),txt=JSON.stringify(out);
-      say((key==='unl'?'Listo: '+out.fixtures.filter(function(f){return!f.fin}).length+' partidos de la Nations League en '+Object.keys(out.groups||{}).length+' grupos.':out.single?'Listo: '+out.fixtures[0].h.name+' vs '+out.fixtures[0].a.name+(out.fixtures[0].comp?' ('+out.fixtures[0].comp+')':'')+'.'+(out.fixtures[0].fin?' Ojo: el partido ya comenzó, así que la app no lo mostrará.':''):'Listo: '+out.roundWord.toLowerCase()+' '+out.round+(out.round2?' y '+out.round2:'')+' de '+out.leagueName+', '+out.fixtures.length+' partidos.')+(out.missing?' '+out.missing+' alineaciones no estaban disponibles; el análisis las omite.':''));
-      var o=$('cj-o');o.style.display='flex';
-      var done=$('cj-s').textContent;
-      try{await navigator.clipboard.writeText(txt);say(done+(APP?' Pulsa "Enviar a Cuota justa". (También quedaron copiados: puedes pegarlos con Ctrl+V en la app.)':' Datos copiados: vuelve a la pestaña de Cuota justa y se importan solos (o pega con Ctrl+V en la app).'))}catch(e){say(done+' Pulsa "Copiar datos" y vuelve a Cuota justa.')}
-      if(APP){var bs=btn('Enviar a Cuota justa',function(){sendApp(txt)});bs.style.background='#9A6514';o.appendChild(bs)}
-      o.appendChild(btn('Copiar datos',async function(){try{await navigator.clipboard.writeText(txt);say('Datos copiados. Vuelve a la pestaña de Cuota justa y se importan solos (o pega con Ctrl+V en la app).')}catch(e){say('No se pudo copiar. Usa "Descargar archivo".')}}));
-      o.appendChild(btn('Descargar archivo',function(){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download='cuota-justa-'+key+'-'+(out.single?out.fixtures[0].id:out.round+(out.round2?'-'+out.round2:''))+'.json';document.body.appendChild(a);a.click();a.remove()}));
-      o.appendChild(btn('Extraer otra liga',function(){$('cj-b').style.display='flex';o.style.display='none'}));
-    }catch(e){say('Error: '+e.message);$('cj-b').style.display='flex'}
+    var N=+$('cj-n').value,cl=$('cj-cl').value,items=[],errs=[],t0=Date.now();
+    for(var i=0;i<sel.length;i++){
+      var k=sel[i],pre=sel.length>1?'['+(i+1)+' de '+sel.length+' · '+(k==='custom'?'partido':LG[k].n)+'] ':'';
+      missing=0;
+      try{items.push(await collect(k,N,function(t){say(pre+t)},cl))}catch(e){errs.push((k==='custom'?'Partido':LG[k].n)+': '+e.message)}
+    }
+    if(!items.length){say('Error: '+errs.join(' · '));$('cj-b').style.display='flex';return}
+    var out=items.length===1?items[0]:{v:1,src:'statshub',tipo:'lote',ts:Date.now(),items:items},txt=JSON.stringify(out);
+    var miss=items.reduce(function(s,x){return s+(x.missing||0)},0);
+    say('Listo'+(sel.length>1?' en '+Math.round((Date.now()-t0)/60000*10)/10+' min':'')+': '+items.map(summary).join(' · ')+'.'+(errs.length?' No se pudo extraer: '+errs.join(' · ')+'.':'')+(miss?' '+miss+' alineaciones no estaban disponibles; el análisis las omite.':''));
+    var o=$('cj-o');o.style.display='flex';
+    var done=$('cj-s').textContent;
+    try{await navigator.clipboard.writeText(txt);say(done+(APP?' Pulsa "Enviar a Cuota justa". (También quedaron copiados: puedes pegarlos con Ctrl+V en la app.)':' Datos copiados: vuelve a la pestaña de Cuota justa y se importan solos (o pega con Ctrl+V en la app).'))}catch(e){say(done+' Pulsa "Copiar datos" y vuelve a Cuota justa.')}
+    if(APP){var bs=btn('Enviar a Cuota justa',function(){sendApp(txt)});bs.style.background='#9A6514';o.appendChild(bs)}
+    o.appendChild(btn('Copiar datos',async function(){try{await navigator.clipboard.writeText(txt);say('Datos copiados. Vuelve a la pestaña de Cuota justa y se importan solos (o pega con Ctrl+V en la app).')}catch(e){say('No se pudo copiar. Usa "Descargar archivo".')}}));
+    o.appendChild(btn('Descargar archivo',function(){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download='cuota-justa-'+(items.length>1?'varias-'+new Date().toISOString().slice(0,10):items[0].league+'-'+(items[0].single?items[0].fixtures[0].id:items[0].round+(items[0].round2?'-'+items[0].round2:'')))+'.json';document.body.appendChild(a);a.click();a.remove()}));
+    o.appendChild(btn('Extraer otras ligas',function(){$('cj-b').style.display='flex';o.style.display='none'}));
   }
 }
 </script>
@@ -1825,7 +1844,7 @@ function installHTML(){
     <h3>Cada jornada</h3>
     <ol class="steps">
       <li>Abre <b>www.statshub.com</b> (cualquier página del sitio).</li>
-      <li>Haz clic en el marcador <b>Extraer jornada</b> y elige la liga. Tarda entre 10 y 40 segundos.</li>
+      <li>Haz clic en el marcador <b>Extraer jornada</b>, marca las ligas que quieras (o <b>Todas</b>) y pulsa <b>Extraer</b>. Cada liga tarda entre 10 y 40 segundos; la Nations League, unos 2 a 3 minutos.</li>
       <li>${location.protocol==='https:'?'Pulsa <b>Enviar a Cuota justa</b>: se abre la app con los datos ya importados.':'Los datos se copian solos: vuelve a esta pestaña y se importan automáticamente (o pega con Ctrl+V en cualquier parte).'}</li>
     </ol>
     <p class="foot">Para tener las alineaciones probables, extrae los datos el mismo día del partido o el día anterior.</p>
@@ -1875,6 +1894,13 @@ function importData(txt){
   if(D&&D.tipo==='respaldo'&&D.keys&&typeof D.keys==='object'){
     let n=0;Object.entries(D.keys).forEach(([k,v])=>{if(/^cj:/.test(k)&&typeof v==='string'){try{localStorage.setItem(k,v);n++}catch(e){throw new Error('El navegador no tiene espacio para restaurar todo el respaldo.')}}});
     return{backup:true,n};
+  }
+  if(D&&D.tipo==='lote'&&Array.isArray(D.items)){
+    const res=[];let first=null;
+    D.items.forEach(it=>{const name=(LEAGUES.find(l=>l.id===it.league)||{}).name||it.leagueName||it.league;
+      try{const r=importData(JSON.stringify(it));res.push({ok:true,name,n:(r.fixtures||[]).length});if(!first)first=r}catch(e){res.push({ok:false,name,err:e.message})}});
+    if(!first)throw new Error('No se pudo importar ninguna liga: '+res.map(r=>r.name+' ('+r.err+')').join('; '));
+    return{lote:true,res,first};
   }
   if(D&&D.tipo==='elo'&&Array.isArray(D.clubs)){_ceIdx=null;if(!store.set('cj:elo',D))throw new Error('El navegador no tiene espacio para guardar los ratings Elo.');S.scoutKey=null;return{elo:true,n:D.clubs.length}}
   if(!D||D.src!=='statshub'||!D.fixtures||!D.teams)throw new Error('Estos datos no vienen del extractor de StatsHub.');
@@ -1982,6 +2008,7 @@ document.getElementById('importFile').addEventListener('change',async e=>{const 
 function afterImport(D,auto){
   const top=h=>document.getElementById('panel').insertAdjacentHTML('afterbegin',h);
   if(D.backup){location.reload();return}
+  if(D.lote){selectLeague(D.first.league);top(`<div class="msg ${D.res.some(r=>!r.ok)?'err':'note'}">${auto?'Importado automáticamente: ':'Importado: '}${D.res.map(r=>r.ok?`${esc(r.name)} (${r.n} partidos)`:`${esc(r.name)}: no se pudo, ${esc(String(r.err).replace(/\.$/,''))}`).join(' · ')}. Cambia de liga en las pestañas de arriba.</div>`);return}
   if(D.elo){S.result=null;selectLeague(S.league);top(`<div class="msg note">${auto?'Importado automáticamente. ':''}Ratings Elo importados: ${D.n} clubes. Se usarán en la Champions, la Europa League, la Nations League (fuerza del plantel) y como complemento en las ligas.</div>`);return}
   selectLeague(D.league);
   if(D.single&&S.lastSingle){

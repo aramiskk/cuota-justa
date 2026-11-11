@@ -291,6 +291,7 @@ section.block.collapsed>*:not(h2){display:none}
       var L={n:'Partidos específicos',ut:eut,refs:[],r:'Fecha'},EURO=true,tid='',season={seasonId:e.seasonId,seasonName:''},T={data:[]},round=e.roundInfo||null,sel=[round];
       var fx=[{id:e.id,r:e.roundInfo||null,ts:+e.timeStartTimestamp,h:{id:E.homeTeam.id,name:E.homeTeam.name},a:{id:E.awayTeam.id,name:E.awayTeam.name},lu:{},ut:eut,
         comp:(E.tournaments&&E.tournaments.name)||(E.unique_tournaments&&E.unique_tournaments.name)||'',fin:e.status&&e.status!=='notstarted'?1:0}];
+      fx[0].g=(E.homeTeam.gender==='F'||E.awayTeam.gender==='F')?'F':(E.homeTeam.gender||'');
       NT=eut===10783||!!(E.homeTeam.national&&E.awayTeam.national);
       if(NT){fx[0].h.iid=E.homeTeam.internalId;fx[0].a.iid=E.awayTeam.internalId;if(eut===10783)fx[0].grp=fx[0].comp}
     }else{
@@ -742,6 +743,10 @@ function eScore(a,b){const A=eToks(a),B=eToks(b);if(!A.length||!B.length)return 
 function loadElo(){return store.get('cj:elo')}
 function eloMap(){return store.get('cj:elomap')||{}}
 function teamCC(D,tid){if(D.euro){const d=D.teams[tid]&&D.teams[tid].dom;return d?UT_CC[d.ut]||null:null}return LG_CC[D.league]||null}
+/* Fútbol femenino: ClubElo y los niveles de liga son de equipos masculinos, así que no se usan. */
+const FEM_RE=/\b(women|womens|woman|femenin[oa]s?|feminin[oa]s?|f[ée]minine|frauen|ladies|femmes|lyonnes|wsl|nwsl)\b|\(w\)|\sW$/i;
+function isFem(D,fx){if(!fx)return false;if(fx.g==='F')return true;if(fx.g==='M')return false;
+  return FEM_RE.test(fx.comp||'')||FEM_RE.test(fx.h.name||'')||FEM_RE.test(fx.a.name||'')}
 function eloFor(D,tid){
   const E=loadElo();if(!E)return null;
   const t=D.teams[tid];if(!t)return null;
@@ -868,7 +873,8 @@ function analyzeData(D,fx){
   let lamH=Math.sqrt(hP.xg*aP.xga)*HA.g[0],lamA=Math.sqrt(aP.xg*hP.xga)*HA.g[1],src='modelo';
   let lvH=null,lvA=null,sqH=null,sqA=null,nSplit=null;
   const T0=lamH+lamA;
-  const eH=D.nt?null:eloFor(D,fx.h.id),eA=D.nt?null:eloFor(D,fx.a.id);let eloS=null;
+  const fem=isFem(D,fx);
+  const eH=D.nt||fem?null:eloFor(D,fx.h.id),eA=D.nt||fem?null:eloFor(D,fx.a.id);let eloS=null;
   if(eH&&eA)eloS=eloSplit(eH.elo-eA.elo+HA.elo,T0);
   if(D.nt){
     const nH=Math.sqrt(hP.xg*aP.xga),nA=Math.sqrt(aP.xg*hP.xga);
@@ -876,7 +882,7 @@ function analyzeData(D,fx){
     let bH=nH,bA=nA;
     if(sqH&&sqA){nSplit=eloSplit(sqH.elo-sqA.elo,nH+nA);bH=Math.exp(.65*Math.log(nSplit.h)+.35*Math.log(nH));bA=Math.exp(.65*Math.log(nSplit.a)+.35*Math.log(nA));src='selecciones'}
     lamH=bH*HA.g[0];lamA=bA*HA.g[1];
-  }else if(D.euro){
+  }else if(D.euro&&!fem){
     lvH=teamLevel(D,fx.h.id);lvA=teamLevel(D,fx.a.id);
     if(eloS){lamH=eloS.h;lamA=eloS.a;src='elo'}
     else{lamH*=Math.pow(lvH.f/lvA.f,.9);lamA*=Math.pow(lvA.f/lvH.f,.9);src='liga'}
@@ -914,7 +920,7 @@ function analyzeData(D,fx){
   proj.h.saves=Math.max(.3,proj.a.sot-lamA*.95);proj.a.saves=Math.max(.3,proj.h.sot-lamH*.95);
   const clH=D.nt&&D.teams[fx.h.id]?D.teams[fx.h.id].players:null,clA=D.nt&&D.teams[fx.a.id]?D.teams[fx.a.id].players:null;
   const hPl=playerModel(hG,proj.h,avgOf(hG,'poss'),luH&&luH.xi,luH&&luH.conf,luH&&luH.nm,clH),aPl=playerModel(aG,proj.a,avgOf(aG,'poss'),luA&&luA.xi,luA&&luA.conf,luA&&luA.nm,clA);
-  return{fx,hG,aG,hForm,aForm,luH,luA,hP,aP,lamH,lamA,src,lamB,mkt,lvH,lvA,eH,eA,eloS,u,cf,HA,sqH,sqA,nSplit,pH,pD,pA,btts,o15,o25,o35,
+  return{fx,hG,aG,hForm,aForm,luH,luA,hP,aP,lamH,lamA,src,lamB,mkt,lvH,lvA,eH,eA,eloS,u,cf,HA,sqH,sqA,nSplit,fem,pH,pD,pA,btts,o15,o25,o35,
     csH:m.reduce((s,r)=>s+r[0],0),csA:m[0].reduce((s,x)=>s+x,0),scores:scores.slice(0,6),proj,hPl,aPl};
 }
 
@@ -1556,6 +1562,7 @@ function renderAnalysisInner(){
   const natT=!D.nt&&D.single&&R.lvH&&R.lvA&&!D.teams[fx.h.id].dom&&!D.teams[fx.a.id].dom;
   if(natT&&R.src!=='mercado')notes.push('Partido de selecciones: la app no tiene un rating de fuerza para selecciones, así que compara a ambos equipos solo por sus últimos partidos, que se jugaron contra rivales de nivel muy distinto. Importa las cuotas de resultado (1X2) y de más/menos goles para anclar la fuerza al mercado; es lo más fiable en este tipo de partidos.');
   else if(R.src==='liga')notes.push(loadElo()?'Fuerza estimada por nivel de liga: no se encontró el Elo de alguno de los equipos (puedes asignarlo abajo). Incluye las cuotas de resultado y goles para anclarla al mercado.':'Fuerza estimada por nivel de liga: menos precisa. Importa los ratings Elo desde clubelo.com, o incluye las cuotas de resultado y goles para anclarla al mercado.');
+  if(R.fem)notes.push(R.src==='mercado'?'Partido femenino: los ratings Elo y los niveles de liga son de equipos masculinos, así que no se usan; la fuerza de los equipos sale de las cuotas que importaste.':'Partido femenino: los ratings Elo y los niveles de liga son de equipos masculinos, así que no se usan. La fuerza sale solo de los últimos partidos de cada equipo, que pueden ser contra rivales de nivel muy distinto. Importa las cuotas 1X2 y de goles para anclarla al mercado antes de confiar en estas probabilidades.');
   if(D.nt){
     if(R.sqH&&R.sqA)notes.push(`Fuerza por plantel: promedio del Elo de club de los ${R.sqH.xi||R.sqA.xi?'titulares de la alineación':'11 jugadores con más minutos'}. ${fx.h.name} ${Math.round(R.sqH.elo)} (${R.sqH.ce} de ${R.sqH.n} jugadores con Elo de ClubElo), ${fx.a.name} ${Math.round(R.sqA.elo)} (${R.sqA.ce} de ${R.sqA.n}).${R.sqH.ce<R.sqH.n||R.sqA.ce<R.sqA.n?` Los clubes sin Elo se estiman por el nivel de su liga${loadElo()?'':' (importa los ratings desde clubelo.com para afinarlo)'}.`:''} En cancha neutral daría ${pct(R.nSplit.We)} de "ganar o empatar a medias" para ${fx.h.name}. Se combina 65% con este rating y 35% con los goles esperados de sus últimos partidos.${R.src==='mercado'?' Como importaste cuotas, los goles quedan anclados al mercado.':''}`);
     else if(R.src!=='mercado')notes.push('Partido de selecciones sin datos de club suficientes para medir la fuerza del plantel: se compara solo por sus últimos partidos, jugados contra rivales de nivel muy distinto. Extrae con "Datos de club" activado para esta liga, o importa las cuotas 1X2 y de goles para anclar la fuerza al mercado.');
@@ -1616,7 +1623,7 @@ function renderAnalysisInner(){
 }
 
 function eloBox(R){
-  const E=loadElo();if(!E||S.D.nt)return'';
+  const E=loadElo();if(!E||S.D.nt||R.fem)return'';
   const D=S.D,row=(tid,name,e)=>{
     const cc=teamCC(D,tid),pool=(cc?E.clubs.filter(c=>c[1]===cc):E.clubs).slice().sort((a,b)=>a[0].localeCompare(b[0]));
     return`<label>Elo de ${esc(name)}<select data-elomap="${tid}"><option value="">${e?`${esc(e.name)} (${e.elo})${e.manual?' · manual':e.approx?' · aproximado':''}`:'Sin asociar'}</option>${pool.map(c=>`<option value="${esc(c[0])}">${esc(c[0])} (${c[2]})</option>`).join('')}<option value="__auto">Volver a la asociación automática</option></select></label>`;

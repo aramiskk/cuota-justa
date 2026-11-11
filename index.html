@@ -254,11 +254,18 @@ section.block.collapsed>*:not(h2){display:none}
     var st=t.data.filter(function(p){return p.isStarter!=null?p.isStarter:!p.isSubstitute});
     return{form:F(st.map(function(p){return p.position})),xi:st.map(function(p){return p.playerId}),conf:t.data[0].predictionType||''};
   }
-  async function eventFromPage(){
+  async function eventFromPage(say){
     var m=location.pathname.match(/\/fixture\/[^\/]+\/(\d+)/);if(!m)return null;var iid=+m[1];
-    var ids=Array.from(new Set(performance.getEntriesByType('resource').map(function(e){var x=e.name.match(/\/api\/event\/(\d+)\//);return x?+x[1]:null}).filter(Boolean)));
+    var ids=Array.from(new Set(performance.getEntriesByType('resource').map(function(e){var x=e.name.match(/\/api\/event\/(\d+)\//);return x?+x[1]:null}).filter(Boolean))).reverse();
     for(var i=0;i<ids.length;i++){var E=await J('/api/event/'+ids[i],true);if(E&&E.events&&E.events.internalId===iid)return E}
-    return ids.length?await J('/api/event/'+ids[0],true):null;
+    var now=Math.floor(Date.now()/1000),wins=[[now-2*86400,now+4*86400],[now+4*86400,now+16*86400],[now-9*86400,now-2*86400]];
+    for(var w=0;w<wins.length;w++){
+      say('Buscando el partido en el calendario de StatsHub…');
+      var bd=await J('/api/event/by-date?startOfDay='+wins[w][0]+'&endOfDay='+wins[w][1],true);
+      var hit=((bd&&bd.data)||[]).find(function(x){return x.events&&x.events.internalId===iid});
+      if(hit){var E2=await J('/api/event/'+hit.events.id,true);if(E2&&E2.events)return E2}
+    }
+    return null;
   }
   async function collect(key,N,say,clubOpt){
     var NT=false;
@@ -278,7 +285,7 @@ section.block.collapsed>*:not(h2){display:none}
       var round=rr[0]||null,sel=rr.length?rr:[null];
     }else if(key==='custom'){
       say('Leyendo el partido de esta página…');
-      var E=await eventFromPage();
+      var E=await eventFromPage(say);
       if(!E||!E.events||!E.homeTeam||!E.awayTeam)throw new Error('No pude identificar el partido. Abre en StatsHub la página del partido, espera a que cargue por completo y vuelve a intentarlo.');
       var e=E.events,eut=(E.unique_tournaments&&E.unique_tournaments.id)||e.uniqueTournamentId;
       var L={n:'Partidos específicos',ut:eut,refs:[],r:'Fecha'},EURO=true,tid='',season={seasonId:e.seasonId,seasonName:''},T={data:[]},round=e.roundInfo||null,sel=[round];
@@ -471,9 +478,16 @@ section.block.collapsed>*:not(h2){display:none}
   var isElo=/(^|\.)clubelo\.com$/.test(location.hostname);
   if(!isElo&&!/(^|\.)statshub\.com$/.test(location.hostname)){alert('Este marcador funciona en www.statshub.com (estadísticas) y en clubelo.com (ratings Elo). Abre una de esas páginas y vuelve a hacer clic en el marcador.');return}
   if(document.getElementById('cj-x'))return;
+  try{performance.setResourceTimingBufferSize(3000)}catch(e){}
   var box=document.createElement('div');box.id='cj-x';
   box.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647;background:#fff;color:#15201B;border:2px solid #1E6B47;border-radius:10px;padding:14px 16px;width:310px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.28)';
-  box.innerHTML='<div style="font-weight:700;font-size:16px;margin-bottom:6px">Cuota justa: extraer jornada</div>'+
+  box.innerHTML='<style>#cj-x,#cj-x *{color-scheme:light;box-sizing:border-box}#cj-x label{color:#15201B;cursor:pointer}'+
+    '#cj-x select{background:#fff;color:#15201B;border:1px solid #8FA79A;border-radius:5px;padding:3px 6px;font:14px system-ui,sans-serif}'+
+    '#cj-x input[type=checkbox]{-webkit-appearance:none;appearance:none;width:17px;height:17px;margin:0 6px 0 0;border:1.5px solid #6F8A7C;border-radius:4px;background:#fff;vertical-align:-3px;position:relative;cursor:pointer}'+
+    '#cj-x input[type=checkbox]:checked{background:#CFEBDB;border-color:#1E6B47}'+
+    '#cj-x input[type=checkbox]:checked::after{content:"";position:absolute;left:4.5px;top:1px;width:5px;height:9px;border:solid #0F2A1D;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}'+
+    '#cj-x input:focus-visible,#cj-x select:focus-visible,#cj-x button:focus-visible{outline:2px solid #1E6B47;outline-offset:2px}</style>'+
+    '<div style="font-weight:700;font-size:16px;margin-bottom:6px">Cuota justa: extraer jornada</div>'+
     '<label style="display:block;margin-bottom:8px">Partidos por equipo <select id="cj-n" style="margin-left:4px"><option>6</option><option selected>8</option><option>10</option></select></label>'+
     '<label style="display:block;margin-bottom:8px">Datos de club (selecciones) <select id="cj-cl" style="margin-left:4px"><option value="ab" selected>Ligas A y B</option><option value="all">Todas (más lento)</option><option value="no">No</option></select></label>'+
     '<div id="cj-b" style="display:flex;flex-direction:column;gap:6px"></div><div id="cj-s" style="margin-top:10px;color:#4A5A52"></div>'+

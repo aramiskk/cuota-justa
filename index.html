@@ -178,6 +178,11 @@ section.block.collapsed>*:not(h2){display:none}
 .tacard .picks li{padding:.35rem 0}.tacard .picks .num{margin-left:auto;margin-right:.6rem}
 .odd.hit{border-color:var(--amber);background:var(--amber-soft)}
 .odd.hit b::after{content:" ✓";font-size:.8em}
+.mktform{margin-top:.6rem;border:1px solid var(--line);border-radius:8px;padding:.5rem .75rem;background:var(--panel)}
+.mktform summary{cursor:pointer;font-weight:600}
+.mkrow{flex-wrap:wrap;align-items:flex-end}
+.mk{display:flex;flex-direction:column;gap:.2rem;font-size:.85rem;min-width:0}
+.mkin{width:5.5rem;padding:.35rem .45rem;font:inherit;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -1609,7 +1614,8 @@ function renderAnalysisInner(){
     ${(()=>{const s=scoutAll()[fx.id];return s?`<div class="scoutbox"><b>¿Vale la pena importar cuotas? <span class="chip ${s.level.c}">${s.level.t}</span></b>${s.reasons.length?reasonsHTML(s,5):'<p class="foot">Sin factores destacados.</p>'}</div>`:''})()}
     ${eloBox(R)}
     <div class="controls"><button class="btn" data-collapse="all">Contraer todo</button><button class="btn" data-collapse="none">Desplegar todo</button></div>
-    <div class="controls">${R.odds?`<span>Cuotas cargadas: <b>${esc(Object.keys(R.odds.casas).map(bookName).join(', '))}</b></span><button class="btn" id="btnOdds">Reemplazar cuotas</button><button class="btn" id="btnOddsDel">Quitar cuotas</button>`:`<button class="btn primary" id="btnOdds">Importar cuotas de este partido</button>`}</div>
+    <div class="controls">${R.odds&&Object.keys(R.odds.casas||{}).length?`<span>Cuotas cargadas: <b>${esc(Object.keys(R.odds.casas).map(bookName).join(', '))}</b></span><button class="btn" id="btnOdds">Reemplazar cuotas</button><button class="btn" id="btnOddsDel">Quitar cuotas</button>`:`<button class="btn${R.odds&&R.odds.mercado?'':' primary'}" id="btnOdds">Importar cuotas de este partido</button>`}</div>
+    ${mktForm(R)}
   </div>
   ${blockNL(R)}
   ${blockResult(R)}
@@ -1631,6 +1637,46 @@ function eloBox(R){
   return`<div class="controls">${row(R.fx.h.id,R.fx.h.name,R.eH)}${row(R.fx.a.id,R.fx.a.name,R.eA)}</div>`;
 }
 
+/* Cuotas de resultado y goles escritas a mano */
+function mktForm(R){
+  const M=(R.odds&&R.odds.mercado)||{},x=M['1x2']||[],gl=M.goles||{},line=Object.keys(gl).includes('2.5')||!Object.keys(gl).length?'2.5':Object.keys(gl)[0],g=gl[line]||[];
+  const v=n=>n!=null&&n!==''?String(n):'',fx=R.fx;
+  const inp=(id,val,lab)=>`<label class="mk">${esc(lab)}<input id="${id}" class="mkin" inputmode="decimal" autocomplete="off" value="${esc(v(val))}" placeholder="—"></label>`;
+  return`<details class="mktform"${M['1x2']||!R.odds?' open':''}><summary>Cuotas de resultado y goles (escribirlas a mano)${M['1x2']?` · <b>${esc(M.casa||'')} ${x.join(' / ')}</b>`:''}</summary>
+    <div class="controls mkrow">
+      <label class="mk">Casa<select id="mkCasa">${['Betano','bet365','Otra'].map(c=>`<option${(M.casa||'Betano')===c?' selected':''}>${c}</option>`).join('')}</select></label>
+      ${inp('mk1',x[0],'Gana '+fx.h.name)}${inp('mkX',x[1],'Empate')}${inp('mk2',x[2],'Gana '+fx.a.name)}
+    </div>
+    <div class="controls mkrow">
+      <label class="mk">Línea de goles<select id="mkLine">${['1.5','2.5','3.5'].map(l=>`<option${l===line?' selected':''}>${l}</option>`).join('')}</select></label>
+      ${inp('mkO',g[0],'Más de')}${inp('mkU',g[1],'Menos de')}
+    </div>
+    <div class="controls"><button class="btn primary" id="mkSave">Guardar y recalcular</button>${R.odds&&R.odds.mercado?'<button class="btn" id="mkDel">Quitar estas cuotas</button>':''}<span class="foot" id="mkMsg">Acepta coma o punto (2,10 o 2.10). Basta con el 1X2; la línea de goles afina el total de goles.</span></div>
+  </details>`;
+}
+function mktSave(){
+  const R=S.result,fx=R.fx,num=id=>{const t=String(document.getElementById(id).value||'').trim().replace(',','.');if(!t)return null;const n=+t;return n>1&&n<1000?n:NaN};
+  const h=num('mk1'),d=num('mkX'),a=num('mk2'),o=num('mkO'),u=num('mkU'),line=document.getElementById('mkLine').value,casa=document.getElementById('mkCasa').value;
+  const msg=document.getElementById('mkMsg'),bad=t=>{msg.innerHTML=`<span style="color:var(--warn)">${esc(t)}</span>`};
+  if([h,d,a,o,u].some(x=>Number.isNaN(x)))return bad('Cada cuota debe ser un número mayor que 1, por ejemplo 2,10.');
+  const has1=h!=null&&d!=null&&a!=null,hasG=o!=null&&u!=null;
+  if(!has1&&!hasG)return bad('Escribe las tres cuotas 1X2, o las dos de la línea de goles.');
+  if((h!=null||d!=null||a!=null)&&!has1)return bad('Faltan cuotas del 1X2: se necesitan las tres.');
+  if((o!=null||u!=null)&&!hasG)return bad('Falta una de las dos cuotas de goles (más o menos).');
+  if(has1){const m=1/h+1/d+1/a;if(m<1||m>1.35)return bad(`Las tres cuotas 1X2 suman un margen de ${Math.round((m-1)*100)}%: revisa que estén bien escritas.`)}
+  if(hasG){const m=1/o+1/u;if(m<1||m>1.25)return bad(`Las cuotas de goles suman un margen de ${Math.round((m-1)*100)}%: revisa que estén bien escritas.`)}
+  const O=loadOdds(fx.id)||{v:1,tipo:'cuotas',partido:fx.h.name+' vs '+fx.a.name,fecha:new Date(fx.ts*1000).toISOString().slice(0,10),casas:{}};
+  const old=O.mercado||{};O.mercado={casa};
+  if(has1)O.mercado['1x2']=[h,d,a];else if(old['1x2'])O.mercado['1x2']=old['1x2'];
+  O.mercado.goles=Object.assign({},old.goles||{});if(hasG)O.mercado.goles[line]=[o,u];
+  if(!store.set('cj:odds:'+fx.id,O))return bad('El navegador no tiene espacio para guardar las cuotas.');
+  S.result=analyzeData(dataFor(fx),fx);(fx.arch?0:snapPred(S.D,fx,S.result));renderAnalysis();
+}
+function mktDel(){
+  const fx=S.result.fx,O=loadOdds(fx.id);if(!O)return;delete O.mercado;
+  if(!Object.keys(O.casas||{}).length){try{localStorage.removeItem('cj:odds:'+fx.id)}catch(e){}}else store.set('cj:odds:'+fx.id,O);
+  S.result=analyzeData(dataFor(fx),fx);(fx.arch?0:snapPred(S.D,fx,S.result));renderAnalysis();
+}
 function blockResult(R){
   const h=R.fx.h.name,a=R.fx.a.name;
   const rows=[
@@ -1967,6 +2013,8 @@ document.getElementById('panel').addEventListener('click',e=>{
   if(gr&&S.result&&gr.dataset.genreal==='1'&&!manCount(S.result.fx.id)&&!loadOdds(S.result.fx.id)){const h=document.querySelector('.genhint');if(h){h.hidden=false;h.style.color='var(--warn)'}return}
   if(gr&&S.result){S.realGen=gr.dataset.genreal==='1'?S.result.fx.id:null;renderAnalysis();const s=document.getElementById(S.realGen?'real':'dream');if(s)s.scrollIntoView({block:'start'});return}
   if(e.target.id==='btnOdds'){openOdds();return}
+  if(e.target.id==='mkSave'){mktSave();return}
+  if(e.target.id==='mkDel'){mktDel();return}
   if(e.target.id==='btnOddsDel'){try{localStorage.removeItem('cj:odds:'+S.result.fx.id)}catch(err){}S.result=analyzeData(dataFor(S.result.fx),S.result.fx);renderAnalysis();return}
   const fxb=e.target.closest('[data-fx]');if(fxb){selectFixture(+fxb.dataset.fx);return}
   const t=e.target.closest('[data-market]');

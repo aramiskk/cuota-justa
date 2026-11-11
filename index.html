@@ -255,7 +255,7 @@ section.block.collapsed>*:not(h2){display:none}
     return{form:F(st.map(function(p){return p.position})),xi:st.map(function(p){return p.playerId}),conf:t.data[0].predictionType||''};
   }
   async function eventFromPage(){
-    var m=location.pathname.match(/^\/fixture\/[^\/]+\/(\d+)/);if(!m)return null;var iid=+m[1];
+    var m=location.pathname.match(/\/fixture\/[^\/]+\/(\d+)/);if(!m)return null;var iid=+m[1];
     var ids=Array.from(new Set(performance.getEntriesByType('resource').map(function(e){var x=e.name.match(/\/api\/event\/(\d+)\//);return x?+x[1]:null}).filter(Boolean)));
     for(var i=0;i<ids.length;i++){var E=await J('/api/event/'+ids[i],true);if(E&&E.events&&E.events.internalId===iid)return E}
     return ids.length?await J('/api/event/'+ids[0],true):null;
@@ -508,7 +508,7 @@ section.block.collapsed>*:not(h2){display:none}
     }));
     return;
   }
-  if(/^\/fixture\//.test(location.pathname)){var b1=btn('Extraer este partido',function(){run(['custom'])});b1.style.background='#9A6514';$('cj-b').appendChild(b1)}
+  if(/\/fixture\/[^\/]+\/\d+/.test(location.pathname)){var b1=btn('Extraer este partido',function(){run(['custom'])});b1.style.background='#9A6514';$('cj-b').appendChild(b1)}
   var saved=null;try{saved=JSON.parse(localStorage.getItem('cj-sel')||'null')}catch(e){}
   var keys=Object.keys(LG),lst=document.createElement('div');
   lst.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin:4px 0 6px';

@@ -228,9 +228,13 @@ section.block.collapsed>*:not(h2){display:none}
 </dialog>
 
 <script type="text/plain" id="xsrc">async function cjExtract(test){
-  var LG={bundesliga:{n:'Bundesliga',ut:35,refs:[2673,2672],r:'Jornada'},laliga:{n:'LaLiga',ut:8,refs:[2829,2817],r:'Jornada'},argentina:{n:'Liga Argentina',ut:155,refs:[3211,3202],r:'Fecha'},premier:{n:'Premier League',ut:17,refs:[42,17],r:'Jornada'},ligue1:{n:'Ligue 1',ut:34,refs:[1644,1649],r:'Jornada'},brasileirao:{n:'Brasileirão',ut:325,refs:[5981,1963],r:'Fecha'},seriea:{n:'Serie A',ut:23,refs:[2687,2692,2697,2714],r:'Jornada'},ucl:{n:'Champions League',ut:7,refs:[2829,2817,2672,2673,17,44],r:'Fecha',euro:1},uel:{n:'Europa League',ut:679,refs:[2692,2702,3002,40,2816,14,2714],r:'Fecha',euro:1},uecl:{n:'Conference League',ut:17015,refs:[2953,1653,2538,2686,2999,2903],r:'Fecha',euro:1},unl:{n:'Nations League',ut:10783,refs:[],r:'Fecha',euro:1,nt:1}};
+  var LG={bundesliga:{n:'Alemania',ln:'Bundesliga',ut:35,refs:[2673,2672],r:'Jornada',cups:[217]},laliga:{n:'España',ln:'LaLiga',ut:8,refs:[2829,2817],r:'Jornada',cups:[329]},premier:{n:'Inglaterra',ln:'Premier League',ut:17,refs:[42,17],r:'Jornada',cups:[19,21]},ligue1:{n:'Francia',ln:'Ligue 1',ut:34,refs:[1644,1649],r:'Jornada',cups:[335]},seriea:{n:'Italia',ln:'Serie A',ut:23,refs:[2687,2692,2697,2714],r:'Jornada',cups:[328]},argentina:{n:'Argentina',ln:'Liga Profesional',ut:155,refs:[3211,3202],r:'Fecha',cups:[1024],playoffs:1,cat:'Argentina'},brasileirao:{n:'Brasil',ln:'Brasileirão',ut:325,refs:[5981,1963],r:'Fecha',cups:[373]},ucl:{n:'Champions League',ut:7,r:'Fecha',euro:1,bd:9},uel:{n:'Europa League',ut:679,r:'Fecha',euro:1,bd:9},uecl:{n:'Conference League',ut:17015,r:'Fecha',euro:1,bd:9},libertadores:{n:'Libertadores',ut:384,r:'Fecha',euro:1,bd:18},sudamericana:{n:'Sudamericana',ut:480,r:'Fecha',euro:1,bd:18},unl:{n:'Nations League',ut:10783,refs:[],r:'Fecha',euro:1,nt:1}};
   var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
   var missing=0;
+  var utOf=function(x){var e=x.events||{};return(x.unique_tournaments&&x.unique_tournaments.id)||e.uniqueTournamentId||(x.tournaments&&x.tournaments.uniqueTournamentId)};
+  var badComp=/Women|Femen|F[ée]minin|Frauen|Reserve|Youth|U-?1\d|U-?2[0-3]|Primavera|Juvenil|Amateur/i;
+  function mkFx(x,nowS){var e=x.events;return{id:e.id,r:e.roundInfo||null,ts:+e.timeStartTimestamp,h:{id:x.homeTeam.id,iid:x.homeTeam.internalId,name:x.homeTeam.name},a:{id:x.awayTeam.id,iid:x.awayTeam.internalId,name:x.awayTeam.name},lu:{},
+    fin:(e.status!=='notstarted'||+e.timeStartTimestamp<=nowS)?1:0,cut:utOf(x),comp:(x.tournaments&&x.tournaments.name)||'',slug:e.roundSlug||'',cid:e.customId||'',g:(x.homeTeam.gender==='F'||x.awayTeam.gender==='F')?'F':''}}
   async function J(u,opt){
     for(var a=0;a<4;a++){
       try{var r=await fetch(u);if(r.ok)return await r.json();if(r.status===404||r.status===400)break}catch(e){}
@@ -278,15 +282,25 @@ section.block.collapsed>*:not(h2){display:none}
       var L=LG.unl,EURO=true,tid='',NT=true;
       say('Buscando los partidos de la Nations League…');
       var nowS=Math.floor(Date.now()/1000),bd=await J('/api/event/by-date?startOfDay='+(nowS-36*3600)+'&endOfDay='+(nowS+10*86400));
-      var utOf=function(x){var e=x.events||{};return(x.unique_tournaments&&x.unique_tournaments.id)||e.uniqueTournamentId||(x.tournaments&&x.tournaments.uniqueTournamentId)};
+      var WIN=(bd&&bd.data)||[];
       var nl=((bd&&bd.data)||[]).filter(function(x){return utOf(x)===L.ut&&x.homeTeam&&x.awayTeam&&x.events});
       if(!nl.some(function(x){return x.events.status==='notstarted'}))throw new Error('No hay partidos de la Nations League en los próximos 10 días.');
       var y0=new Date(nl[0].events.timeStartTimestamp*1000).getUTCFullYear(),m0=new Date(nl[0].events.timeStartTimestamp*1000).getUTCMonth();
       var season={seasonId:nl[0].events.seasonId,seasonName:(m0>=6?y0:y0-1)+'-'+String((m0>=6?y0+1:y0)%100).padStart(2,'0')},T={data:[]};
-      var fx=nl.map(function(x){var e=x.events;return{id:e.id,r:e.roundInfo||null,ts:+e.timeStartTimestamp,grp:(x.tournaments&&x.tournaments.name)||'',
-        h:{id:x.homeTeam.id,iid:x.homeTeam.internalId,name:x.homeTeam.name},a:{id:x.awayTeam.id,iid:x.awayTeam.internalId,name:x.awayTeam.name},lu:{},
-        fin:(e.status!=='notstarted'||+e.timeStartTimestamp<=nowS)?1:0}});
-      var rr=Array.from(new Set(fx.filter(function(f){return!f.fin&&f.r}).map(function(f){return f.r}))).sort(function(a,b){return a-b});
+      var fx=nl.map(function(x){var f=mkFx(x,nowS);f.grp=f.comp;return f});
+      var rr=Array.from(new Set(fx.filter(function(f){return!f.fin&&f.r&&/Gr\./.test(f.comp)}).map(function(f){return f.r}))).sort(function(a,b){return a-b});
+      var round=rr[0]||null,sel=rr.length?rr:[null];
+    }else if(LG[key]&&LG[key].bd){
+      var L=LG[key],EURO=true,tid='';
+      say('Buscando los partidos de '+L.n+'…');
+      var nowS=Math.floor(Date.now()/1000),bd=await J('/api/event/by-date?startOfDay='+(nowS-36*3600)+'&endOfDay='+(nowS+L.bd*86400));
+      var WIN=(bd&&bd.data)||[];
+      var cs=WIN.filter(function(x){return utOf(x)===L.ut&&x.homeTeam&&x.awayTeam&&x.events&&x.homeTeam.gender!=='F'&&!badComp.test((x.tournaments&&x.tournaments.name)||'')});
+      if(!cs.some(function(x){return x.events.status==='notstarted'}))throw new Error(L.n+' no tiene partidos en los próximos '+L.bd+' días.');
+      var y0=new Date(cs[0].events.timeStartTimestamp*1000).getUTCFullYear(),m0=new Date(cs[0].events.timeStartTimestamp*1000).getUTCMonth();
+      var season={seasonId:cs[0].events.seasonId,seasonName:L.ut===384||L.ut===480?String(y0):(m0>=6?y0:y0-1)+'-'+String((m0>=6?y0+1:y0)%100).padStart(2,'0')},T={data:[]};
+      var fx=cs.map(function(x){return mkFx(x,nowS)});
+      var rr=Array.from(new Set(fx.filter(function(f){return!f.fin&&f.r&&!/Knockout|Playoff/i.test(f.comp)&&(!f.slug||/^round-\d+$/.test(f.slug))}).map(function(f){return f.r}))).sort(function(a,b){return a-b});
       var round=rr[0]||null,sel=rr.length?rr:[null];
     }else if(key==='custom'){
       say('Leyendo el partido de esta página…');
@@ -297,6 +311,7 @@ section.block.collapsed>*:not(h2){display:none}
       var fx=[{id:e.id,r:e.roundInfo||null,ts:+e.timeStartTimestamp,h:{id:E.homeTeam.id,name:E.homeTeam.name},a:{id:E.awayTeam.id,name:E.awayTeam.name},lu:{},ut:eut,
         comp:(E.tournaments&&E.tournaments.name)||(E.unique_tournaments&&E.unique_tournaments.name)||'',fin:e.status&&e.status!=='notstarted'?1:0}];
       fx[0].g=(E.homeTeam.gender==='F'||E.awayTeam.gender==='F')?'F':(E.homeTeam.gender||'');
+      fx[0].cut=eut;fx[0].slug=e.roundSlug||'';fx[0].cid=e.customId||'';var nowS=Math.floor(Date.now()/1000),WIN=null;
       NT=eut===10783||!!(E.homeTeam.national&&E.awayTeam.national);
       if(NT){fx[0].h.iid=E.homeTeam.internalId;fx[0].a.iid=E.awayTeam.internalId;if(eut===10783)fx[0].grp=fx[0].comp}
     }else{
@@ -311,33 +326,68 @@ section.block.collapsed>*:not(h2){display:none}
       var e0=evs.find(function(e){return e.events.seasonId===s0.seasonId});
       if(e0){season=s0;ev=e0}
     }
-    if(!ev)throw new Error('No encontré la temporada actual de '+L.n+'. Puede que los equipos de referencia ya no participen; avísame para actualizarlos.');
-    var T=await J('/api/tournament/'+ev.tournaments.internalId+'/'+season.seasonId+'/events');
+    if(!ev&&!L.cups)throw new Error('No encontré la temporada actual de '+L.n+'. Puede que los equipos de referencia ya no participen; avísame para actualizarlos.');
+    if(!season)season={seasonId:null,seasonName:''};
+    var T=ev?await J('/api/tournament/'+ev.tournaments.internalId+'/'+season.seasonId+'/events'):{data:[]};
     var ups=((T&&T.data)||[]).filter(function(x){return x.events.status==='notstarted'});
-    if(!ups.length)throw new Error(L.n+' no tiene partidos próximos publicados.');
+    if(!ups.length&&!L.cups)throw new Error(L.n+' no tiene partidos próximos publicados.');
+    var round=null,sel=[null],fx=[];
+    if(ups.length){
     var byR={};ups.forEach(function(x){(byR[x.events.roundInfo]=byR[x.events.roundInfo]||[]).push(x)});
     var rs=Object.keys(byR).map(Number),mx=Math.max.apply(null,rs.map(function(r){return byR[r].length}));
     var first=function(r){return Math.min.apply(null,byR[r].map(function(x){return +x.events.timeStartTimestamp}))};
     var mxR=Math.max.apply(null,rs);
-    var round=rs.filter(function(r){return r>=mxR-1||byR[r].length>=3}).sort(function(a,b){return first(a)-first(b)})[0];
-    var sel=[round];
+    round=rs.filter(function(r){return r>=mxR-1||byR[r].length>=3}).sort(function(a,b){return first(a)-first(b)})[0];
+    sel=[round];
     if(byR[round].length<Math.max(3,Math.ceil(mx/2))&&byR[round+1])sel.push(round+1);
     var selEv=ups.filter(function(x){return sel.indexOf(x.events.roundInfo)>=0});
     var w0=Math.min.apply(null,selEv.map(function(x){return +x.events.timeStartTimestamp})),w1=Math.max.apply(null,selEv.map(function(x){return +x.events.timeStartTimestamp}));
-    var fx=ups.filter(function(x){var t=+x.events.timeStartTimestamp;return sel.indexOf(x.events.roundInfo)>=0||(t>=w0-86400&&t<=w1+86400)}).map(function(x){return{id:x.events.id,r:x.events.roundInfo,ts:+x.events.timeStartTimestamp,
+    fx=ups.filter(function(x){var t=+x.events.timeStartTimestamp;return sel.indexOf(x.events.roundInfo)>=0||(t>=w0-86400&&t<=w1+86400)}).map(function(x){return{id:x.events.id,r:x.events.roundInfo,ts:+x.events.timeStartTimestamp,
       h:{id:x.homeTeam.id,name:x.homeTeam.name},a:{id:x.awayTeam.id,name:x.awayTeam.name},lu:{}}});
-    say('Buscando partidos ya jugados en las últimas 36 horas…');
-    var nowS=Math.floor(Date.now()/1000),bd=await J('/api/event/by-date?startOfDay='+(nowS-36*3600)+'&endOfDay='+nowS,true);
-    ((bd&&bd.data)||[]).forEach(function(x){var e=x.events||{},ut=(x.unique_tournaments&&x.unique_tournaments.id)||e.uniqueTournamentId||(x.tournaments&&x.tournaments.uniqueTournamentId);
-      if(ut!==L.ut||e.seasonId!==season.seasonId||e.status==='notstarted'||!x.homeTeam||!x.awayTeam)return;
-      if(fx.some(function(f){return f.id===e.id}))return;
+    }
+    say('Buscando copas y partidos jugados en las últimas 36 horas…');
+    var nowS=Math.floor(Date.now()/1000),bd=await J('/api/event/by-date?startOfDay='+(nowS-36*3600)+'&endOfDay='+(nowS+10*86400),true);
+    var WIN=(bd&&bd.data)||[],lgTeams=new Set();fx.forEach(function(f){lgTeams.add(f.h.id);lgTeams.add(f.a.id)});
+    var isCup=function(x){var ut=utOf(x),tn=(x.tournaments&&x.tournaments.name)||'',cn=(x.categories&&x.categories.name)||'';
+      if(!x.homeTeam||!x.awayTeam||x.homeTeam.gender==='F'||badComp.test(tn))return false;
+      return(L.cups||[]).indexOf(ut)>=0||(L.playoffs&&ut===L.ut&&/Playoff/i.test(tn))||(L.cat&&cn===L.cat&&/Supercopa|Trofeo de Campeones|Recopa/i.test(tn))};
+    WIN.forEach(function(x){var e=x.events||{},ut=utOf(x);
+      if(!x.homeTeam||!x.awayTeam||fx.some(function(f){return f.id===e.id}))return;
+      if(isCup(x)){
+        if(lgTeams.size&&!lgTeams.has(x.homeTeam.id)&&!lgTeams.has(x.awayTeam.id))return;
+        fx.push(mkFx(x,nowS));return;
+      }
+      if(ut!==L.ut||e.seasonId!==season.seasonId||e.status==='notstarted'||+e.timeStartTimestamp>nowS)return;
       fx.push({id:e.id,r:e.roundInfo,ts:+e.timeStartTimestamp,fin:1,h:{id:x.homeTeam.id,name:x.homeTeam.name},a:{id:x.awayTeam.id,name:x.awayTeam.name},lu:{}});
     });
+    if(!fx.some(function(f){return!f.fin}))throw new Error(L.n+' no tiene partidos de liga ni de copa en los próximos 10 días.');
+    }
+    // Eliminación directa: buscar la otra pierna de cada llave y los partidos cercanos de cada equipo
+    var isKO=function(f){if(!f.cid||!f.cut)return false;if(L.cups&&L.cups.indexOf(f.cut)>=0)return true;var c=f.comp||'';if(/Group|Gr\.|League Phase|Liga|Clausura|Apertura/i.test(c)&&!/Playoff|Knockout/i.test(c))return false;if(/Playoff|Knockout|Final|Copa |Cup|Coppa|Pokal|Coupe|Supercopa/i.test(c))return true;return!!f.slug&&!/group|league|^round-\d+$/i.test(f.slug)};
+    fx.forEach(function(f){if(isKO(f))f.ko=1});
+    var koFx=fx.filter(function(f){return f.ko&&!f.fin});
+    var PAST=null;
+    if(fx.some(function(f){return!f.fin})){
+      say('Revisando llaves de ida y vuelta y partidos cercanos…');
+      PAST=await J('/api/event/by-date?startOfDay='+(nowS-(koFx.length?35:5)*86400)+'&endOfDay='+(nowS-36*3600),true);
+      var POOL=((PAST&&PAST.data)||[]).concat(WIN||[]);
+      if(key==='custom'&&koFx.length){var FUT=await J('/api/event/by-date?startOfDay='+(nowS-36*3600)+'&endOfDay='+(nowS+12*86400),true);POOL=POOL.concat((FUT&&FUT.data)||[])}
+      koFx.forEach(function(f){
+        var o=POOL.filter(function(x){return x.events&&x.events.customId===f.cid&&x.events.id!==f.id&&Math.abs(+x.events.timeStartTimestamp-f.ts)<40*86400&&(f.slug?x.events.roundSlug===f.slug:((x.tournaments&&x.tournaments.name)===f.comp))}).filter(function(x,i,a){return a.findIndex(function(z){return z.events.id===x.events.id})===i});
+        o.forEach(function(x){var e=x.events,nt=e.homeScoreNormaltime!=null?[e.homeScoreNormaltime,e.awayScoreNormaltime]:null;
+          var L1={id:e.id,ts:+e.timeStartTimestamp,h:x.homeTeam.id,a:x.awayTeam.id};
+          if(+e.timeStartTimestamp<f.ts){if(nt&&e.status==='finished'){L1.gh=nt[0];L1.ga=nt[1];f.leg1=L1}else f.leg1p=L1}else f.leg2=L1});
+      });
+      var near={};POOL.forEach(function(x){if(!x.homeTeam||!x.awayTeam||!x.events)return;[[x.homeTeam.id,x.awayTeam.name],[x.awayTeam.id,x.homeTeam.name]].forEach(function(p){(near[p[0]]=near[p[0]]||[]).push([+x.events.timeStartTimestamp,(x.tournaments&&x.tournaments.name)||'',p[1],x.events.id])})});
+      fx.forEach(function(f){if(f.fin)return;var nb=function(id){return(near[id]||[]).filter(function(r){return r[3]!==f.id&&Math.abs(r[0]-f.ts)<=4*86400}).filter(function(r,i,a){return a.findIndex(function(z){return z[3]===r[3]})===i}).sort(function(a,b){return a[0]-b[0]}).map(function(r){return r.slice(0,3)})};f.near={h:nb(f.h.id),a:nb(f.a.id)}});
     }
     var teams={},n=0;
+    var lgSet=new Set();fx.forEach(function(f){if(!f.cut||f.cut===L.ut){lgSet.add(f.h.id);lgSet.add(f.a.id)}});
+    var tidOf=function(id){return EURO?'':lgSet.has(id)?tid:''};
     async function loadTeam(id){
-      var p=await J('/api/team/'+id+'/performance?tournamentId='+tid+'&limit='+(N+1)+'&location=both');
-      var q=await J('/api/team/'+id+'/players/performance?tournamentId='+tid+'&limit='+(N+1)+'&location=both',NT);
+      var tt=tidOf(id);
+      var p=await J('/api/team/'+id+'/performance?tournamentId='+tt+'&limit='+(N+1)+'&location=both');
+      var q=await J('/api/team/'+id+'/players/performance?tournamentId='+tt+'&limit='+(N+1)+'&location=both',NT);
       teams[id]={p:p,q:q};
       if(NT){
         teams[id].nl=await J('/api/team/'+id+'/performance?tournamentId=10783&limit=24&location=both',true);
@@ -346,15 +396,15 @@ section.block.collapsed>*:not(h2){display:none}
       }
     }
     var ids=Array.from(new Set(fx.flatMap(function(f){return[f.h.id,f.a.id]})));
-    await pool(ids,async function(id){await loadTeam(id);say(L.r+' '+round+': equipos '+(++n)+' de '+ids.length)});
+    await pool(ids,async function(id){await loadTeam(id);say((round?L.r+' '+round:L.n)+': equipos '+(++n)+' de '+ids.length)});
     var compOf=function(t){var o={};((t.q&&t.q.events)||[]).forEach(function(e){if(e.events&&e.tournaments)o[e.events.id]={ut:e.tournaments.uniqueTournamentId,n:e.tournaments.name,s:e.events.seasonId}});return o};
     for(var pass=0;pass<(EURO?2:1)&&T.data.length>=10;pass++){
       say('Buscando partidos de la '+L.r.toLowerCase()+' que no vienen en el calendario…');
       var known=new Set(fx.flatMap(function(f){return[f.h.id,f.a.id]})),opp=new Set();
       Object.values(teams).forEach(function(t){var co=compOf(t);((t.p&&t.p.data)||[]).forEach(function(m){if(EURO&&!(co[m.event.id]&&co[m.event.id].ut===L.ut))return;[m.homeTeam&&m.homeTeam.id,m.awayTeam&&m.awayTeam.id].forEach(function(x){if(x&&!known.has(x))opp.add(x)})})});
       var t0=Math.min.apply(null,fx.map(function(f){return f.ts})),t1=Math.max.apply(null,fx.map(function(f){return f.ts}));
-      var appear=function(id){return fx.filter(function(f){return f.h.id===id||f.a.id===id}).length};
-      ids.forEach(function(id){if(appear(id)<sel.length)opp.add(id)});
+      var appear=function(id){return fx.filter(function(f){return(!f.cut||f.cut===L.ut&&!/Playoff/i.test(f.comp||''))&&(f.h.id===id||f.a.id===id)}).length};
+      ids.forEach(function(id){if(fx.some(function(f){return(!f.cut)&&(f.h.id===id||f.a.id===id)})&&appear(id)<sel.length)opp.add(id)});
       await pool(Array.from(opp),async function(id){
         if(appear(id)>=sel.length)return;
         var u=await J('/api/team/'+id+'/upcoming-events?page=1&limit=12',true);
@@ -427,7 +477,7 @@ section.block.collapsed>*:not(h2){display:none}
       });
       var co=compOf(t),cnt={};
       matches.forEach(function(m){var c=co[m.id];if(c){m.cu=c.ut;m.cn=c.n}
-        if(EURO){if(Date.now()/1000-m.ts>150*86400)m.prev=1}else if(c&&c.s!==season.seasonId)m.prev=1});
+        if(EURO||tidOf(id)===''){if(Date.now()/1000-m.ts>150*86400)m.prev=1}else if(c&&c.s!==season.seasonId)m.prev=1});
       Object.values(co).forEach(function(c){if(c.ut===7||c.ut===679||c.ut===17015||/Europa|Champions|Conference|Cup|Copa|Coppa|Pokal|Ta[cç]a|Coupe|Super ?cup|Supercopa|Troph|Shield|Qualif|Nations League|Friendl|European Championship|EURO|Olympic/i.test(c.n))return;var k=c.ut;cnt[k]=cnt[k]||{ut:c.ut,n:c.n,c:0};cnt[k].c++});
       var dom=Object.values(cnt).sort(function(a,b){return b.c-a.c})[0]||null;
       var evset=new Set(matches.map(function(m){return m.id})),players={};
@@ -542,7 +592,7 @@ section.block.collapsed>*:not(h2){display:none}
   $('cj-all').onchange=function(){var v=this.checked;boxes().forEach(function(x){x.checked=v});sync()};
   lst.addEventListener('change',function(e){if(e.target.dataset.k)sync()});
   sync();
-  function summary(out){return out.leagueName==='Nations League'||out.league==='unl'?out.fixtures.filter(function(f){return!f.fin}).length+' partidos de la Nations League en '+Object.keys(out.groups||{}).length+' grupos':out.single?out.fixtures[0].h.name+' vs '+out.fixtures[0].a.name+(out.fixtures[0].comp?' ('+out.fixtures[0].comp+')':'')+(out.fixtures[0].fin?' (ya comenzó: la app no lo mostrará)':''):out.leagueName+': '+out.roundWord.toLowerCase()+' '+out.round+(out.round2?' y '+out.round2:'')+', '+out.fixtures.length+' partidos'}
+  function summary(out){var cups=Array.from(new Set(out.fixtures.filter(function(f){return!f.fin&&f.cut&&f.cut!==out.ut||/Playoff/i.test(f.comp||'')}).map(function(f){return f.comp.split(',')[0]})));if(!out.single&&out.ut!==10783&&cups.length&&out.leagueName&&!out.euro)return out.leagueName+': '+out.fixtures.filter(function(f){return!f.fin}).length+' partidos ('+cups.join(', ')+(out.round?' y '+out.roundWord.toLowerCase()+' '+out.round:'')+')';return out.leagueName==='Nations League'||out.league==='unl'?out.fixtures.filter(function(f){return!f.fin}).length+' partidos de la Nations League en '+Object.keys(out.groups||{}).length+' grupos':out.single?out.fixtures[0].h.name+' vs '+out.fixtures[0].a.name+(out.fixtures[0].comp?' ('+out.fixtures[0].comp+')':'')+(out.fixtures[0].fin?' (ya comenzó: la app no lo mostrará)':''):out.leagueName+': '+out.roundWord.toLowerCase()+' '+out.round+(out.round2?' y '+out.round2:'')+', '+out.fixtures.length+' partidos'}
   async function run(sel){
     $('cj-b').style.display='none';$('cj-o').innerHTML='';$('cj-o').style.display='none';
     var N=+$('cj-n').value,cl=$('cj-cl').value,items=[],errs=[],t0=Date.now();
@@ -567,9 +617,11 @@ section.block.collapsed>*:not(h2){display:none}
 </script>
 <script>
 /* ===================== Configuración ===================== */
-const LEAGUES=[{id:'bundesliga',name:'Bundesliga'},{id:'laliga',name:'LaLiga'},{id:'premier',name:'Premier League'},{id:'ligue1',name:'Ligue 1'},{id:'argentina',name:'Liga Argentina'},{id:'brasileirao',name:'Brasileirão'},{id:'seriea',name:'Serie A'},{id:'ucl',name:'Champions'},{id:'uel',name:'Europa League'},{id:'uecl',name:'Conference'},{id:'unl',name:'Nations League'},{id:'custom',name:'Específicos'}];
+const LEAGUES=[{id:'bundesliga',name:'Alemania'},{id:'laliga',name:'España'},{id:'premier',name:'Inglaterra'},{id:'ligue1',name:'Francia'},{id:'seriea',name:'Italia'},{id:'argentina',name:'Argentina'},{id:'brasileirao',name:'Brasil'},{id:'ucl',name:'Champions'},{id:'uel',name:'Europa League'},{id:'uecl',name:'Conference'},{id:'libertadores',name:'Libertadores'},{id:'sudamericana',name:'Sudamericana'},{id:'unl',name:'Nations League'},{id:'custom',name:'Específicos'}];
+const LEAGUE_LN={bundesliga:'Bundesliga',laliga:'LaLiga',premier:'Premier League',ligue1:'Ligue 1',seriea:'Serie A',argentina:'Liga Profesional',brasileirao:'Brasileirão'};
 /* Nivel relativo de cada liga local (aproximado, basado en el rendimiento europeo de sus clubes) */
-const LEVELS={17:1.00,8:0.95,35:0.93,23:0.93,34:0.86,238:0.80,37:0.78,38:0.72,52:0.72,45:0.68,215:0.66,185:0.66,172:0.65,36:0.64,39:0.64,202:0.62,218:0.62,20:0.62,40:0.60,170:0.60,210:0.60,266:0.58,211:0.58};
+const LEVELS={17:1.00,8:0.95,35:0.93,23:0.93,34:0.86,238:0.80,37:0.78,38:0.72,52:0.72,45:0.68,215:0.66,185:0.66,172:0.65,36:0.64,39:0.64,202:0.62,218:0.62,20:0.62,40:0.60,170:0.60,210:0.60,266:0.58,211:0.58,
+  325:0.76,155:0.68,18:0.74,44:0.72,54:0.70,53:0.68,24:0.62,182:0.62,390:0.58,25:0.55,703:0.50};
 const LEVEL_DEFAULT=0.56;
 /* Ventaja de local, como factor respecto de cancha neutral.
    Clubes: la que usaba el modelo (goles x1.06 / x0.95, Elo +60, remates y córners x1.04 / x0.96).
@@ -579,7 +631,8 @@ const LEVEL_DEFAULT=0.56;
 const HOME_CLUB={g:[1.06,.95],sh:[1.04,.96],cor:[1.04,.96],cards:[1,1],elo:60};
 const HOME_NT={g:[1.095,.905],sh:[1.095,.905],cor:[1.108,.892],cards:[.937,1.063],elo:0};
 function homeAdv(D){return D&&D.nt?HOME_NT:HOME_CLUB}
-function teamLevel(D,tid){const d=D.teams[tid]&&D.teams[tid].dom;if(!d)return{f:LEVEL_DEFAULT,n:'liga desconocida',known:false};const f=LEVELS[d.ut];return{f:f||LEVEL_DEFAULT,n:d.n,known:!!f}}
+const HOME_NEUTRAL={g:[1,1],sh:[1,1],cor:[1,1],cards:[1,1],elo:0};
+function teamLevel(D,tid,cup){const def=cup?.45:LEVEL_DEFAULT,d=D.teams[tid]&&D.teams[tid].dom;if(!d)return{f:def,n:'liga desconocida',known:false};const f=LEVELS[d.ut];return{f:f||def,n:d.n,known:!!f}}
 const TZ='America/Santiago';
 const MARKETS={
   sh:{label:'Remates',lines:[1,2,3],unit:'remates'},
@@ -874,7 +927,8 @@ function analyzeData(D,fx){
   const aForm=(luA&&luA.form)||(aG.find(g=>g.form)||{}).form||null;
   const prior=D._prior||leaguePrior(D,fx.fin?fx.ts:null);
   const hP=profile(hG,true,aForm,S.alpha,prior),aP=profile(aG,false,hForm,S.alpha,prior);
-  const HA=homeAdv(D);
+  const KR=fx.ko?koRules(D,fx):null,cupX=!D.euro&&isCupFx(D,fx);
+  const HA=KR&&KR.neutral?HOME_NEUTRAL:homeAdv(D);
   let lamH=Math.sqrt(hP.xg*aP.xga)*HA.g[0],lamA=Math.sqrt(aP.xg*hP.xga)*HA.g[1],src='modelo';
   let lvH=null,lvA=null,sqH=null,sqA=null,nSplit=null;
   const T0=lamH+lamA;
@@ -887,10 +941,10 @@ function analyzeData(D,fx){
     let bH=nH,bA=nA;
     if(sqH&&sqA){nSplit=eloSplit(sqH.elo-sqA.elo,nH+nA);bH=Math.exp(.65*Math.log(nSplit.h)+.35*Math.log(nH));bA=Math.exp(.65*Math.log(nSplit.a)+.35*Math.log(nA));src='selecciones'}
     lamH=bH*HA.g[0];lamA=bA*HA.g[1];
-  }else if(D.euro&&!fem){
-    lvH=teamLevel(D,fx.h.id);lvA=teamLevel(D,fx.a.id);
+  }else if((D.euro||cupX)&&!fem){
+    lvH=teamLevel(D,fx.h.id,cupX);lvA=teamLevel(D,fx.a.id,cupX);
     if(eloS){lamH=eloS.h;lamA=eloS.a;src='elo'}
-    else{lamH*=Math.pow(lvH.f/lvA.f,.9);lamA*=Math.pow(lvA.f/lvH.f,.9);src='liga'}
+    else{const ex=cupX?.6:.9;lamH*=Math.pow(lvH.f/lvA.f,ex);lamA*=Math.pow(lvA.f/lvH.f,ex);src='liga'}
   }else if(eloS){lamH=.7*lamH+.3*eloS.h;lamA=.7*lamA+.3*eloS.a}
   const lamB={h:lamH,a:lamA};
   const Od=loadOdds(fx.id),mkt=Od&&Od.mercado?marketLambda(Od.mercado,lamH+lamA):null;
@@ -913,6 +967,9 @@ function analyzeData(D,fx){
   }
   proj.h.cor=Math.sqrt(hP.cor*aP.cora)*HA.cor[0];proj.a.cor=Math.sqrt(aP.cor*hP.cora)*HA.cor[1];
   proj.h.cards=Math.sqrt(hP.cards*aP.cardsa)*HA.cards[0];proj.a.cards=Math.sqrt(aP.cards*hP.cardsa)*HA.cards[1];
+  let aggD=null;
+  if(KR&&fx.leg1&&fx.leg1.gh!=null){aggD=fx.leg1.h===fx.h.id?fx.leg1.gh-fx.leg1.ga:fx.leg1.ga-fx.leg1.gh;
+    if(aggD!==0){const tr=aggD<0?'h':'a',ld=aggD<0?'a':'h';['sh','sot'].forEach(k=>{proj[tr][k]*=1.07;proj[ld][k]*=.93})}}
   proj.h.poss=clamp((hP.poss+(100-aP.poss))/2,25,75);
   if(src!=='modelo'||D.nt)proj.h.poss=clamp(.5*proj.h.poss+.5*(50+(lamH-lamA)*11),25,75);
   proj.a.poss=100-proj.h.poss;
@@ -925,7 +982,7 @@ function analyzeData(D,fx){
   proj.h.saves=Math.max(.3,proj.a.sot-lamA*.95);proj.a.saves=Math.max(.3,proj.h.sot-lamH*.95);
   const clH=D.nt&&D.teams[fx.h.id]?D.teams[fx.h.id].players:null,clA=D.nt&&D.teams[fx.a.id]?D.teams[fx.a.id].players:null;
   const hPl=playerModel(hG,proj.h,avgOf(hG,'poss'),luH&&luH.xi,luH&&luH.conf,luH&&luH.nm,clH),aPl=playerModel(aG,proj.a,avgOf(aG,'poss'),luA&&luA.xi,luA&&luA.conf,luA&&luA.nm,clA);
-  return{fx,hG,aG,hForm,aForm,luH,luA,hP,aP,lamH,lamA,src,lamB,mkt,lvH,lvA,eH,eA,eloS,u,cf,HA,sqH,sqA,nSplit,fem,pH,pD,pA,btts,o15,o25,o35,
+  return{fx,hG,aG,hForm,aForm,luH,luA,hP,aP,lamH,lamA,src,lamB,mkt,lvH,lvA,eH,eA,eloS,u,cf,HA,sqH,sqA,nSplit,fem,KR,aggD,cupX,pH,pD,pA,btts,o15,o25,o35,
     csH:m.reduce((s,r)=>s+r[0],0),csA:m[0].reduce((s,x)=>s+x,0),scores:scores.slice(0,6),proj,hPl,aPl};
 }
 
@@ -1265,7 +1322,10 @@ function oddBtn(label,p,hiAt=.7){
   const id='o'+(++oddSeq);oddReg[id]={label,p};
   return`<button class="odd${p>=hiAt?' hi':''}" data-odd="${id}" title="Comparar con una cuota"><b>${fair(p)}</b><span>${pct(p)}</span></button>`;
 }
-function roundName(D){if(D.single)return'Partidos específicos';return`${D.roundWord||'Jornada'} ${D.round}${D.round2?' y '+D.round2:''}`}
+function roundName(D){if(D.single)return'Partidos específicos';
+  const base=D.round?`${D.roundWord||'Jornada'} ${D.round}${D.round2?' y '+D.round2:''}`:'';
+  const cups=Array.from(new Set((D.fixtures||[]).filter(f=>!f.arch&&!f.fin&&isCupFx(D,f)).map(f=>compShort(f))));
+  return[base,cups.join(', ')].filter(Boolean).join(' + ')||'Próximos partidos'}
 
 
 /* ===================== Explorador de la jornada ===================== */
@@ -1373,6 +1433,90 @@ function realFor(fx){
   return{gh:home?m0.gf:m0.ga,ga:home?m0.ga:m0.gf,shH:H.sh,shA:A.sh,sotH:H.sot,sotA:A.sot,corH:H.cor,corA:A.cor,ycH:H.yc,ycA:A.yc,svH:H.sv,svA:A.sv,possH:H.poss,possA:A.poss,pl};
 }
 
+/* ===================== Eliminación directa ===================== */
+function isCupFx(D,fx){return!!(fx&&fx.cut&&D&&D.ut&&fx.cut!==D.ut)||/Playoff/i.test((fx&&fx.comp)||'')}
+function compShort(fx){const c=String(fx.comp||'');if(/Clausura Playoffs/i.test(c))return'Playoffs del Clausura';if(/Apertura Playoffs/i.test(c))return'Playoffs del Apertura';
+  return c.replace(/^(UEFA|CONMEBOL)\s+/,'').replace(/,.*$/,'')}
+function koRoundLabel(fx){const s=String(fx.slug||'').toLowerCase();
+  const M={'final':'Final','semifinals':'Semifinal','semifinal':'Semifinal','quarterfinals':'Cuartos de final','quarterfinal':'Cuartos de final','round-of-16':'Octavos de final','round-of-32':'Dieciseisavos de final','round-of-64':'Treintaidosavos de final','playoff':'Repechaje','playoffs':'Repechaje','knockout-round-playoffs':'Repechaje','knockout-phase-playoffs':'Repechaje'};
+  if(M[s])return M[s];const m=s.match(/^round-(\d+)$/);if(m)return'Ronda '+m[1];return s?s.replace(/-/g,' '):''}
+function koLegLabel(fx){return fx.leg1||fx.leg1p?'vuelta':fx.leg2?'ida':''}
+function fxCompLabel(D,fx){
+  if(!fx.comp||(!isCupFx(D,fx)&&!fx.ko&&!D.euro))return(LEAGUE_LN[D.league]||D.leagueName||'')+(fx.r&&!D.single?` · ${D.roundWord||'Jornada'} ${fx.r}`:'');
+  const r=fx.ko?koRoundLabel(fx):'',l=fx.ko?koLegLabel(fx):'';
+  return[compShort(fx),[r,l?`(${l})`:''].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}
+/* Reglas por competición: ¿hay alargue si quedan empatados? ¿la final es en cancha neutral? */
+function koRules(D,fx){
+  const ut=fx.cut||D.ut,s=String(fx.slug||'').toLowerCase(),fin=s==='final',two=!!(fx.leg1||fx.leg1p||fx.leg2);
+  let et=true,neutral=false,why='';
+  if(ut===384||ut===480){et=!two;neutral=fin&&!two;why=two?'CONMEBOL: en llaves de ida y vuelta no hay alargue, se va directo a penales.':'Final a partido único: alargue y penales.'}
+  else if(ut===7||ut===679||ut===17015){et=true;neutral=fin&&!two;why='UEFA: sin gol de visitante; si la llave queda igualada hay alargue y penales.'}
+  else if(ut===21){et=fin||two;neutral=fin;why=et?'Copa de la Liga inglesa: semifinal y final con alargue y penales.':'Copa de la Liga inglesa: antes de semifinales se va directo a penales.'}
+  else if(ut===335){et=fin;neutral=fin;why=fin?'Copa de Francia: la final tiene alargue.':'Copa de Francia: hasta semifinales se va directo a penales.'}
+  else if(ut===373){et=false;neutral=fin&&!two;why='Copa de Brasil: empate, directo a penales (revisa la regla de la final).'}
+  else if(ut===1024){et=false;neutral=true;why='Copa Argentina: cancha neutral y, si empatan, directo a penales.'}
+  else if(ut===19){et=true;neutral=s==='semifinals'||fin;why='FA Cup: sin partidos de desempate; alargue y penales.'}
+  else if(ut===155){et=true;neutral=fin;why='Playoffs de la Liga Profesional: alargue y penales; la final es en cancha neutral.'}
+  else if(ut===10783){et=true;why='Nations League: sin gol de visitante; alargue y penales.'}
+  else{et=true;neutral=fin&&!two;why='Si quedan empatados: alargue y penales.'}
+  const ov=store.get('cj:ko:'+fx.id)||{};
+  if(ov.et!=null)et=!!ov.et;if(ov.neutral!=null)neutral=!!ov.neutral;
+  return{et,neutral,two,leg:fx.leg1?2:fx.leg2||fx.leg1p?(fx.leg1p?2:1):0,why,ov};
+}
+/* Probabilidad de clasificar: 90 minutos (o la llave completa), alargue (30 minutos al ritmo de ~0,9 por minuto) y penales 50/50 */
+function koProbs(D,R){
+  const fx=R.fx,K=R.KR;if(!K)return null;
+  const N=12,row=l=>{const r=[];for(let k=0;k<N;k++)r.push(pois(k,l));return r};
+  const diffDist=(lh,la)=>{const a=row(lh),b=row(la),d={};for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i-j;d[k]=(d[k]||0)+a[i]*b[j]}return d};
+  const conv=(A,B)=>{const d={};for(const x in A)for(const y in B){const k=+x+ +y;d[k]=(d[k]||0)+A[x]*B[y]}return d};
+  const ETF=.3;
+  let dist,etH,etA,base=0,pending=false;
+  if(K.leg===2){
+    if(fx.leg1&&fx.leg1.gh!=null)base=fx.leg1.h===fx.h.id?fx.leg1.gh-fx.leg1.ga:fx.leg1.ga-fx.leg1.gh;else pending=true;
+    dist=diffDist(R.lamH,R.lamA);const s={};for(const k in dist)s[+k+base]=dist[k];dist=s;etH=R.lamH*ETF;etA=R.lamA*ETF;
+  }else if(K.leg===1){
+    const H2=K.neutral?HOME_NEUTRAL:homeAdv(D),nH=R.lamH/R.HA.g[0],nA=R.lamA/R.HA.g[1];
+    const l2H=nH*H2.g[1],l2A=nA*H2.g[0];
+    dist=conv(diffDist(R.lamH,R.lamA),diffDist(l2H,l2A));etH=l2H*ETF;etA=l2A*ETF;
+  }else{dist=diffDist(R.lamH,R.lamA);etH=R.lamH*ETF;etA=R.lamA*ETF}
+  let pH=0,pA=0,p0=0;for(const k in dist){if(+k>0)pH+=dist[k];else if(+k<0)pA+=dist[k];else p0+=dist[k]}
+  let eW=0,eD=1,eL=0;if(K.et){const e=diffDist(etH,etA);eW=0;eD=0;eL=0;for(const k in e){if(+k>0)eW+=e[k];else if(+k<0)eL+=e[k];else eD+=e[k]}}
+  const pen=p0*(K.et?eD:1);
+  const h={n90:pH,et:p0*(K.et?eW:0),pen:pen/2},a={n90:pA,et:p0*(K.et?eL:0),pen:pen/2};
+  h.q=h.n90+h.et+h.pen;a.q=a.n90+a.et+a.pen;
+  return{h,a,pET:K.et?p0:0,pPen:pen,base,pending};
+}
+function nearNotes(D,fx){
+  if(!fx.near)return[];const out=[];
+  [['h',fx.h.name],['a',fx.a.name]].forEach(([k,n])=>{const L=(fx.near[k]||[]).filter(r=>!/Friendl|Amistos/i.test(r[1]));if(!L.length)return;
+    out.push(`${n}: ${L.map(r=>{const dd=Math.round((r[0]-fx.ts)/86400);return`${dd<0?'jugó':'juega'} ${compShort({comp:r[1]})} vs ${r[2]} (${dd<0?Math.abs(dd)+' día'+(Math.abs(dd)===1?'':'s')+' antes':dd+' día'+(dd===1?'':'s')+' después'})`}).join('; ')}`)});
+  return out.length?[`Calendario cercano, posible rotación: ${out.join('. ')}.`]:[];
+}
+function blockKO(R){
+  const D=S.D,fx=R.fx;if(!R.KR)return'';
+  const K=R.KR,P=koProbs(D,R);if(!P)return'';
+  const ko=store.get('cj:kodds:'+fx.id)||{},fo=p=>p>0?fair(p):'—';
+  const inp=(key,p)=>{const v=ko[key];let c='';if(v&&p>0){const fv=1/p;c=v>=fv*1.05?' vhi':v>=fv?' vok':' vno'}return`<input class="minp${c}" data-kodd="${key}" inputmode="decimal" value="${v?esc(String(v)):''}" placeholder="cuota" style="width:5rem">`};
+  const cell=(key,p)=>`<td class="num">${pct(p)}<br><span class="foot">justa ${fo(p)}</span></td><td>${inp(key,p)}</td>`;
+  const rows=[['Clasifica','q'],[K.leg===1?'Clasifica sin alargue (en los 180 minutos)':'Clasifica en tiempo normal','n90']];
+  if(K.et)rows.push(['Clasifica en tiempo extra','et']);
+  rows.push(['Clasifica en penales','pen']);
+  const L1=fx.leg1;
+  const legTxt=K.leg===2?(L1&&L1.gh!=null?`Partido de vuelta. Ida: ${L1.h===fx.h.id?fx.h.name:fx.a.name} ${L1.gh}-${L1.ga} ${L1.h===fx.h.id?fx.a.name:fx.h.name}. Global para ${fx.h.name}: ${P.base>0?'+':''}${P.base}.`:'Partido de vuelta, pero no encontré el resultado de la ida: se calcula como si la llave empezara igualada.'):K.leg===1?'Partido de ida: la clasificación considera también la vuelta, en la cancha del otro equipo.':'Partido único.';
+  return`<section class="block" id="ko"><h2>Clasificación</h2>
+    <p class="sub">${esc(fxCompLabel(D,fx))}. ${esc(legTxt)} ${esc(K.why)}${K.neutral?' Se juega en cancha neutral: el modelo no da ventaja de local.':''}</p>
+    <div class="scroll"><table><thead><tr><th>Mercado</th><th>${esc(fx.h.name)}</th><th>Cuota casa</th><th>${esc(fx.a.name)}</th><th>Cuota casa</th></tr></thead><tbody>
+    ${rows.map(([t,k])=>`<tr><td>${esc(t)}</td>${cell('h_'+k,P.h[k])}${cell('a_'+k,P.a[k])}</tr>`).join('')}
+    </tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>Mercado</th><th>Probabilidad</th><th>Cuota justa</th><th>Cuota casa</th></tr></thead><tbody>
+    ${K.et?`<tr><td>Hay alargue</td><td class="num">${pct(P.pET)}</td><td class="num">${fo(P.pET)}</td><td>${inp('et',P.pET)}</td></tr>`:''}
+    <tr><td>Hay penales</td><td class="num">${pct(P.pPen)}</td><td class="num">${fo(P.pPen)}</td><td>${inp('pen',P.pPen)}</td></tr></tbody></table></div>
+    <div class="controls"><label>Si empatan<select data-koset="et"><option value="1"${K.et?' selected':''}>Alargue y penales</option><option value="0"${K.et?'':' selected'}>Directo a penales</option></select></label>
+      <label>Cancha<select data-koset="neutral"><option value="0"${K.neutral?'':' selected'}>Local y visita</option><option value="1"${K.neutral?' selected':''}>Neutral</option></select></label>
+      ${K.ov&&(K.ov.et!=null||K.ov.neutral!=null)?'<button class="btn" data-koset="reset">Volver a la regla del torneo</button>':''}</div>
+    <p class="foot">Los mercados de resultado, goles, tarjetas, córners y jugadores se pagan a los 90 minutos más descuento, igual que en el resto de la app; solo "Clasifica" incluye alargue y penales. El alargue se proyecta como 30 minutos al 90% del ritmo de goles del partido (en la Champions, 0,93 goles por alargue) y los penales como 50/50, porque la ventaja de patear primero no está demostrada y se sortea en el momento. Escribe la cuota de la casa para compararla: verde si paga más que la justa.${R.aggD?` En la vuelta, el equipo que pierde la llave suele rematar más: se suma un 7% a sus remates y se resta un 7% al rival.`:''}</p>
+  </section>`;
+}
 /* ===================== Nations League: escenarios de la fase de grupos ===================== */
 function nlInfo(name){const m=String(name||'').match(/League\s+([A-D])\b.*?Gr(?:oup)?\.?\s*(\d+)/i);return m?{L:m[1].toUpperCase(),g:+m[2]}:null}
 function nlShort(name){const i=nlInfo(name);return i?`Liga ${i.L} · Grupo ${i.g}`:String(name||'')}
@@ -1533,7 +1677,7 @@ function renderSide(){
         <span><img src="${logo(f.h.id)}" alt="" loading="lazy">${esc(f.h.name)}</span>
         <span><img src="${logo(f.a.id)}" alt="" loading="lazy">${esc(f.a.name)}</span>
         ${D.single&&f.comp?`<small>${esc(f.comp)}</small>`:''}
-        ${D.nt&&f.grp?`<small>${esc(nlShort(f.grp))}${f.r?' · Fecha '+f.r:''}</small>`:D.round2&&f.r?`<small>${esc(D.roundWord||'Jornada')} ${f.r}${f.r===D.round?' (pendiente)':''}</small>`:''}
+        ${(isCupFx(D,f)||f.ko)&&!(D.nt&&nlInfo(f.grp))?`<small>${esc(fxCompLabel(D,f))}</small>`:D.nt&&f.grp?`<small>${esc(nlShort(f.grp))}${f.r?' · Fecha '+f.r:''}</small>`:D.round2&&f.r?`<small>${esc(D.roundWord||'Jornada')} ${f.r}${f.r===D.round?' (pendiente)':''}</small>`:''}
         ${lu?`<small>${lu.conf==='confirmed'?'Alineaciones confirmadas':'Alineaciones probables'}</small>`:''}
         ${(f.arch||f.fin)?(()=>{const r=realFor(f);return`<small><span class="chip mid">${r?`Jugado ${r.gh}–${r.ga}`:'Comenzado'}: ${f.arch?'proyección previa':'proyección reconstruida'}</span></small>`})():(f.ts*1000<Date.now()?'<small>Ya comenzó</small>':'')}
         ${SC[f.id]&&SC[f.id].score>=12?`<small><span class="chip ${SC[f.id].level.c}">${SC[f.id].level.t} importar cuotas</span></small>`:''}
@@ -1562,11 +1706,12 @@ function renderAnalysisInner(){
   if(R.hP.n<3||R.aP.n<3)notes.push(`Muestra corta: ${fx.h.name} tiene ${R.hP.n} y ${fx.a.name} ${R.aP.n} partidos con estadísticas. Las cifras se acercan al promedio de la liga para compensar.`);
   if(R.hP.xgReal<R.hP.n||R.aP.xgReal<R.aP.n)notes.push('En algunos partidos no hay xG. En esos casos se estima a partir de los remates totales y al arco.');
   if(R.hG.some(g=>g.prev)||R.aG.some(g=>g.prev))notes.push('Se incluyen partidos de la temporada anterior para completar la muestra. Pesan algo menos y aparecen marcados en "Partidos usados".');
-  if(D.euro&&!D.nt&&R.lvH&&R.lvA&&!(D.single&&!D.teams[fx.h.id].dom&&!D.teams[fx.a.id].dom))notes.push(`Nivel de liga local: ${fx.h.name}, ${R.lvH.n} (${R.lvH.f.toFixed(2)}${R.lvH.known?'':', estimado'}); ${fx.a.name}, ${R.lvA.n} (${R.lvA.f.toFixed(2)}${R.lvA.known?'':', estimado'}).`);
+  if((D.euro||R.cupX)&&!D.nt&&R.lvH&&R.lvA&&!(D.single&&!D.teams[fx.h.id].dom&&!D.teams[fx.a.id].dom))notes.push(`Nivel de liga local: ${fx.h.name}, ${R.lvH.n} (${R.lvH.f.toFixed(2)}${R.lvH.known?'':', estimado'}); ${fx.a.name}, ${R.lvA.n} (${R.lvA.f.toFixed(2)}${R.lvA.known?'':', estimado'}).`);
   if(R.src==='mercado')notes.push(`Fuerza de los equipos anclada al mercado${R.mkt.src?' ('+R.mkt.src+')':''}: ${R.mkt.has1x2?'cuotas de resultado':''}${R.mkt.has1x2&&R.mkt.hasGoals?' y ':''}${R.mkt.hasGoals?'cuotas de goles':''}.`);
   const natT=!D.nt&&D.single&&R.lvH&&R.lvA&&!D.teams[fx.h.id].dom&&!D.teams[fx.a.id].dom;
   if(natT&&R.src!=='mercado')notes.push('Partido de selecciones: la app no tiene un rating de fuerza para selecciones, así que compara a ambos equipos solo por sus últimos partidos, que se jugaron contra rivales de nivel muy distinto. Importa las cuotas de resultado (1X2) y de más/menos goles para anclar la fuerza al mercado; es lo más fiable en este tipo de partidos.');
   else if(R.src==='liga')notes.push(loadElo()?'Fuerza estimada por nivel de liga: no se encontró el Elo de alguno de los equipos (puedes asignarlo abajo). Incluye las cuotas de resultado y goles para anclarla al mercado.':'Fuerza estimada por nivel de liga: menos precisa. Importa los ratings Elo desde clubelo.com, o incluye las cuotas de resultado y goles para anclarla al mercado.');
+  nearNotes(D,fx).forEach(n=>notes.push(n));
   if(R.fem)notes.push(R.src==='mercado'?'Partido femenino: los ratings Elo y los niveles de liga son de equipos masculinos, así que no se usan; la fuerza de los equipos sale de las cuotas que importaste.':'Partido femenino: los ratings Elo y los niveles de liga son de equipos masculinos, así que no se usan. La fuerza sale solo de los últimos partidos de cada equipo, que pueden ser contra rivales de nivel muy distinto. Importa las cuotas 1X2 y de goles para anclarla al mercado antes de confiar en estas probabilidades.');
   if(D.nt){
     if(R.sqH&&R.sqA)notes.push(`Fuerza por plantel: promedio del Elo de club de los ${R.sqH.xi||R.sqA.xi?'titulares de la alineación':'11 jugadores con más minutos'}. ${fx.h.name} ${Math.round(R.sqH.elo)} (${R.sqH.ce} de ${R.sqH.n} jugadores con Elo de ClubElo), ${fx.a.name} ${Math.round(R.sqA.elo)} (${R.sqA.ce} de ${R.sqA.n}).${R.sqH.ce<R.sqH.n||R.sqA.ce<R.sqA.n?` Los clubes sin Elo se estiman por el nivel de su liga${loadElo()?'':' (importa los ratings desde clubelo.com para afinarlo)'}.`:''} En cancha neutral daría ${pct(R.nSplit.We)} de "ganar o empatar a medias" para ${fx.h.name}. Se combina 65% con este rating y 35% con los goles esperados de sus últimos partidos.${R.src==='mercado'?' Como importaste cuotas, los goles quedan anclados al mercado.':''}`);
@@ -1596,7 +1741,7 @@ function renderAnalysisInner(){
   const maxN=D.N||8;
   panel.innerHTML=`
   <div class="match">
-    <div class="when">${esc(fmtDay(fx.ts*1000))}, ${fmtTime(fx.ts*1000)} (hora de Chile). ${esc(roundName(D))}</div>
+    <div class="when">${esc(fmtDay(fx.ts*1000))}, ${fmtTime(fx.ts*1000)} (hora de Chile). ${esc(D.single&&!fx.comp?roundName(D):fxCompLabel(D,fx))}</div>
     <div class="vs">
       <div class="side-team"><img src="${logo(fx.h.id)}" alt=""><div><b>${esc(fx.h.name)}</b><small>Local${R.hForm?', '+esc(R.hForm):''}</small></div></div>
       <div class="xgline">${f1(R.lamH)} – ${f1(R.lamA)}<small>goles esperados</small>${R.real?`<span class="realscore">${R.real.gh} – ${R.real.ga}</span><small>goles reales</small>`:''}</div>
@@ -1618,6 +1763,7 @@ function renderAnalysisInner(){
     ${mktForm(R)}
   </div>
   ${blockNL(R)}
+  ${blockKO(R)}
   ${blockResult(R)}
   ${blockTeam(R)}
   ${blockForm(R)}
@@ -2014,6 +2160,7 @@ document.getElementById('panel').addEventListener('click',e=>{
   if(gr&&S.result){S.realGen=gr.dataset.genreal==='1'?S.result.fx.id:null;renderAnalysis();const s=document.getElementById(S.realGen?'real':'dream');if(s)s.scrollIntoView({block:'start'});return}
   if(e.target.id==='btnOdds'){openOdds();return}
   if(e.target.id==='mkSave'){mktSave();return}
+  if(e.target.dataset&&e.target.dataset.koset==='reset'&&e.target.tagName==='BUTTON'){try{localStorage.removeItem('cj:ko:'+S.result.fx.id)}catch(x){}S.result=analyzeData(dataFor(S.result.fx),S.result.fx);renderAnalysis();return}
   if(e.target.id==='mkDel'){mktDel();return}
   if(e.target.id==='btnOddsDel'){try{localStorage.removeItem('cj:odds:'+S.result.fx.id)}catch(err){}S.result=analyzeData(dataFor(S.result.fx),S.result.fx);renderAnalysis();return}
   const fxb=e.target.closest('[data-fx]');if(fxb){selectFixture(+fxb.dataset.fx);return}
@@ -2140,7 +2287,12 @@ document.getElementById('panel').addEventListener('change',e=>{
   if(e.target.id==='taMin'){S.tall.min=+e.target.value;if(S.tall.res){genTeamAll()}renderTeamAll()}
   if(e.target.id==='taAll'){S.tall.all=e.target.checked;if(S.tall.res){genTeamAll()}renderTeamAll()}
 });
-document.getElementById('panel').addEventListener('change',e=>{if(e.target.id==='calToggle'){store.set('cj:calOn',e.target.checked);S.calCache=null;S.scoutKey=null;renderCalibration()}});
+document.getElementById('panel').addEventListener('change',e=>{
+  const ks=e.target.dataset&&e.target.dataset.koset;
+  if(ks&&e.target.tagName==='SELECT'&&S.result){const k='cj:ko:'+S.result.fx.id,o=store.get(k)||{};o[ks]=e.target.value==='1';store.set(k,o);S.result=analyzeData(dataFor(S.result.fx),S.result.fx);renderAnalysis();const b=document.getElementById('ko');if(b)b.scrollIntoView({block:'start'});return}
+  const kd=e.target.dataset&&e.target.dataset.kodd;
+  if(kd&&S.result){const k='cj:kodds:'+S.result.fx.id,o=store.get(k)||{},v=+String(e.target.value).trim().replace(',','.');if(v>1)o[kd]=v;else delete o[kd];store.set(k,o);renderAnalysis();const b=document.getElementById('ko');if(b)b.scrollIntoView({block:'start'});return}
+  if(e.target.id==='calToggle'){store.set('cj:calOn',e.target.checked);S.calCache=null;S.scoutKey=null;renderCalibration()}});
 document.getElementById('btnHelp').addEventListener('click',()=>{
   S.sel=null;S.result=null;renderSide();
   document.getElementById('panel').innerHTML=`<div class="empty"><h2>Extractor de StatsHub</h2>${installHTML()}</div>`;bindInstall();

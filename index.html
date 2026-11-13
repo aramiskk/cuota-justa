@@ -228,7 +228,7 @@ section.block.collapsed>*:not(h2){display:none}
 </dialog>
 
 <script type="text/plain" id="xsrc">async function cjExtract(test){
-  var LG={bundesliga:{n:'Alemania',ln:'Bundesliga',ut:35,refs:[2673,2672],r:'Jornada',cups:[217]},laliga:{n:'España',ln:'LaLiga',ut:8,refs:[2829,2817],r:'Jornada',cups:[329]},premier:{n:'Inglaterra',ln:'Premier League',ut:17,refs:[42,17],r:'Jornada',cups:[19,21]},ligue1:{n:'Francia',ln:'Ligue 1',ut:34,refs:[1644,1649],r:'Jornada',cups:[335]},seriea:{n:'Italia',ln:'Serie A',ut:23,refs:[2687,2692,2697,2714],r:'Jornada',cups:[328]},argentina:{n:'Argentina',ln:'Liga Profesional',ut:155,refs:[3211,3202],r:'Fecha',cups:[1024],playoffs:1,cat:'Argentina'},brasileirao:{n:'Brasil',ln:'Brasileirão',ut:325,refs:[5981,1963],r:'Fecha',cups:[373]},ucl:{n:'Champions League',ut:7,r:'Fecha',euro:1,bd:9},uel:{n:'Europa League',ut:679,r:'Fecha',euro:1,bd:9},uecl:{n:'Conference League',ut:17015,r:'Fecha',euro:1,bd:9},libertadores:{n:'Libertadores',ut:384,r:'Fecha',euro:1,bd:18},sudamericana:{n:'Sudamericana',ut:480,r:'Fecha',euro:1,bd:18},unl:{n:'Nations League',ut:10783,refs:[],r:'Fecha',euro:1,nt:1}};
+  var LG={bundesliga:{n:'Alemania',ln:'Bundesliga',ut:35,refs:[2673,2672],r:'Jornada',cups:[217]},laliga:{n:'España',ln:'LaLiga',ut:8,refs:[2829,2817],r:'Jornada',cups:[329]},premier:{n:'Inglaterra',ln:'Premier League',ut:17,refs:[42,17],r:'Jornada',cups:[19,21]},ligue1:{n:'Francia',ln:'Ligue 1',ut:34,refs:[1644,1649],r:'Jornada',cups:[335]},seriea:{n:'Italia',ln:'Serie A',ut:23,refs:[2687,2692,2697,2714],r:'Jornada',cups:[328]},argentina:{n:'Argentina',ln:'Liga Profesional',ut:155,refs:[3211,3202],r:'Fecha',cups:[1024],playoffs:1,cat:'Argentina'},brasileirao:{n:'Brasil',ln:'Brasileirão',ut:325,refs:[5981,1963],r:'Fecha',cups:[373]},ucl:{n:'Champions League',ut:7,r:'Fecha',euro:1,bd:9},uel:{n:'Europa League',ut:679,r:'Fecha',euro:1,bd:9},uecl:{n:'Conference League',ut:17015,r:'Fecha',euro:1,bd:9},libertadores:{n:'Libertadores',ut:384,r:'Fecha',euro:1,bd:18},sudamericana:{n:'Sudamericana',ut:480,r:'Fecha',euro:1,bd:18},unl:{n:'Nations League',ut:10783,refs:[],r:'Fecha',euro:1,nt:1},afcon:{n:'Copa Africana de Naciones',ut:1848,uts:[1848,270],r:'Fecha',euro:1,nt:1,bd:12}};
   var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
   var missing=0;
   var utOf=function(x){var e=x.events||{};return(x.unique_tournaments&&x.unique_tournaments.id)||e.uniqueTournamentId||(x.tournaments&&x.tournaments.uniqueTournamentId)};
@@ -291,11 +291,11 @@ section.block.collapsed>*:not(h2){display:none}
       var rr=Array.from(new Set(fx.filter(function(f){return!f.fin&&f.r&&/Gr\./.test(f.comp)}).map(function(f){return f.r}))).sort(function(a,b){return a-b});
       var round=rr[0]||null,sel=rr.length?rr:[null];
     }else if(LG[key]&&LG[key].bd){
-      var L=LG[key],EURO=true,tid='';
+      var L=LG[key],EURO=true,tid='';NT=!!L.nt;
       say('Buscando los partidos de '+L.n+'…');
       var nowS=Math.floor(Date.now()/1000),bd=await J('/api/event/by-date?startOfDay='+(nowS-36*3600)+'&endOfDay='+(nowS+L.bd*86400));
       var WIN=(bd&&bd.data)||[];
-      var cs=WIN.filter(function(x){return utOf(x)===L.ut&&x.homeTeam&&x.awayTeam&&x.events&&x.homeTeam.gender!=='F'&&!badComp.test((x.tournaments&&x.tournaments.name)||'')});
+      var cs=WIN.filter(function(x){return(L.uts||[L.ut]).indexOf(utOf(x))>=0&&x.homeTeam&&x.awayTeam&&x.events&&x.homeTeam.gender!=='F'&&!badComp.test((x.tournaments&&x.tournaments.name)||'')});
       if(!cs.some(function(x){return x.events.status==='notstarted'}))throw new Error(L.n+' no tiene partidos en los próximos '+L.bd+' días.');
       var y0=new Date(cs[0].events.timeStartTimestamp*1000).getUTCFullYear(),m0=new Date(cs[0].events.timeStartTimestamp*1000).getUTCMonth();
       var season={seasonId:cs[0].events.seasonId,seasonName:L.ut===384||L.ut===480?String(y0):(m0>=6?y0:y0-1)+'-'+String((m0>=6?y0+1:y0)%100).padStart(2,'0')},T={data:[]};
@@ -390,7 +390,7 @@ section.block.collapsed>*:not(h2){display:none}
       var q=await J('/api/team/'+id+'/players/performance?tournamentId='+tt+'&limit='+(N+1)+'&location=both',NT);
       teams[id]={p:p,q:q};
       if(NT){
-        teams[id].nl=await J('/api/team/'+id+'/performance?tournamentId=10783&limit=24&location=both',true);
+        if(key==='unl'||L.ut===10783)teams[id].nl=await J('/api/team/'+id+'/performance?tournamentId=10783&limit=24&location=both',true);
         var f0=fx.find(function(f){return f.h.id===id})||fx.find(function(f){return f.a.id===id}),iid=f0&&(f0.h.id===id?f0.h.iid:f0.a.iid);
         if(iid){var tm=await J('/api/team/'+iid,true),mg=tm&&tm.data&&tm.data.manager;if(mg)teams[id].mgr={id:mg.id,n:mg.name}}
       }
@@ -441,7 +441,8 @@ section.block.collapsed>*:not(h2){display:none}
     var CL={};
     if(NT&&clubOpt!=='no'){
       var lgOf=function(id){var f=fx.find(function(f){return f.h.id===id||f.a.id===id}),m=f&&String(f.grp||'').match(/League\s+([A-D])\b/i);return m?m[1].toUpperCase():''};
-      var tIds=Object.keys(teams).map(Number).filter(function(id){return key==='custom'||clubOpt==='all'||['A','B'].indexOf(lgOf(id))>=0});
+      var soon=function(id){return fx.some(function(f){return!f.fin&&(f.h.id===id||f.a.id===id)&&f.ts<=Date.now()/1000+4*86400})};
+      var tIds=Object.keys(teams).map(Number).filter(function(id){return key==='custom'||clubOpt==='all'||(key==='unl'?['A','B'].indexOf(lgOf(id))>=0:soon(id))});
       var want={};
       tIds.forEach(function(id){var t=teams[id],mins={};
         ((t.q&&t.q.data)||[]).forEach(function(p){var m=0;Object.values(p.stats||{}).forEach(function(s){m+=s.minutesPlayed||0});if(m>0)mins[p.id]=m});
@@ -545,7 +546,7 @@ section.block.collapsed>*:not(h2){display:none}
     '#cj-x input:focus-visible,#cj-x select:focus-visible,#cj-x button:focus-visible{outline:2px solid #1E6B47;outline-offset:2px}</style>'+
     '<div style="font-weight:700;font-size:16px;margin-bottom:6px">Cuota justa: extraer jornada</div>'+
     '<label style="display:block;margin-bottom:8px">Partidos por equipo <select id="cj-n" style="margin-left:4px"><option>6</option><option selected>8</option><option>10</option></select></label>'+
-    '<label style="display:block;margin-bottom:8px">Datos de club (selecciones) <select id="cj-cl" style="margin-left:4px"><option value="ab" selected>Ligas A y B</option><option value="all">Todas (más lento)</option><option value="no">No</option></select></label>'+
+    '<label style="display:block;margin-bottom:8px" title="Recomendado: en la Nations League, Ligas A y B; en otras selecciones, los equipos que juegan en los próximos 4 días.">Datos de club (selecciones) <select id="cj-cl" style="margin-left:4px"><option value="ab" selected>Recomendado</option><option value="all">Todas (más lento)</option><option value="no">No</option></select></label>'+
     '<div id="cj-b" style="display:flex;flex-direction:column;gap:6px"></div><div id="cj-s" style="margin-top:10px;color:#4A5A52"></div>'+
     '<div id="cj-o" style="display:none;flex-direction:column;gap:6px;margin-top:10px"></div>'+
     '<button id="cj-c" style="margin-top:10px;width:100%;padding:6px;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer">Cerrar</button>';
@@ -617,7 +618,7 @@ section.block.collapsed>*:not(h2){display:none}
 </script>
 <script>
 /* ===================== Configuración ===================== */
-const LEAGUES=[{id:'bundesliga',name:'Alemania'},{id:'laliga',name:'España'},{id:'premier',name:'Inglaterra'},{id:'ligue1',name:'Francia'},{id:'seriea',name:'Italia'},{id:'argentina',name:'Argentina'},{id:'brasileirao',name:'Brasil'},{id:'ucl',name:'Champions'},{id:'uel',name:'Europa League'},{id:'uecl',name:'Conference'},{id:'libertadores',name:'Libertadores'},{id:'sudamericana',name:'Sudamericana'},{id:'unl',name:'Nations League'},{id:'custom',name:'Específicos'}];
+const LEAGUES=[{id:'bundesliga',name:'Alemania'},{id:'laliga',name:'España'},{id:'premier',name:'Inglaterra'},{id:'ligue1',name:'Francia'},{id:'seriea',name:'Italia'},{id:'argentina',name:'Argentina'},{id:'brasileirao',name:'Brasil'},{id:'ucl',name:'Champions'},{id:'uel',name:'Europa League'},{id:'uecl',name:'Conference'},{id:'libertadores',name:'Libertadores'},{id:'sudamericana',name:'Sudamericana'},{id:'unl',name:'Nations League'},{id:'afcon',name:'Copa Africana'},{id:'custom',name:'Específicos'}];
 const LEAGUE_LN={bundesliga:'Bundesliga',laliga:'LaLiga',premier:'Premier League',ligue1:'Ligue 1',seriea:'Serie A',argentina:'Liga Profesional',brasileirao:'Brasileirão'};
 /* Nivel relativo de cada liga local (aproximado, basado en el rendimiento europeo de sus clubes) */
 const LEVELS={17:1.00,8:0.95,35:0.93,23:0.93,34:0.86,238:0.80,37:0.78,38:0.72,52:0.72,45:0.68,215:0.66,185:0.66,172:0.65,36:0.64,39:0.64,202:0.62,218:0.62,20:0.62,40:0.60,170:0.60,210:0.60,266:0.58,211:0.58,
@@ -630,7 +631,11 @@ const LEVEL_DEFAULT=0.56;
    (104 partidos: xG 1.39-1.26, córners 4.79-3.78, amarillas 1.88-2.30). Sin bono Elo: la fuerza se compara en neutral. */
 const HOME_CLUB={g:[1.06,.95],sh:[1.04,.96],cor:[1.04,.96],cards:[1,1],elo:60};
 const HOME_NT={g:[1.095,.905],sh:[1.095,.905],cor:[1.108,.892],cards:[.937,1.063],elo:0};
-function homeAdv(D){return D&&D.nt?HOME_NT:HOME_CLUB}
+/* Eliminatorias de la Copa Africana en StatsHub (498 partidos desde 2019): goles 1.36-0.95, remates 13.1-9.9,
+   córners 4.95-3.84, amarillas 1.46-1.92; el local se lleva el 60% de los puntos. Algunos se jugaron en cancha neutral, así que en casa real la ventaja es algo mayor. */
+const HOME_AFR={g:[1.177,.823],sh:[1.142,.858],cor:[1.126,.874],cards:[.864,1.136],elo:0};
+const isAfr=D=>!!D&&(D.league==='afcon'||D.ut===1848||D.ut===270);
+function homeAdv(D){return D&&D.nt?(isAfr(D)?HOME_AFR:HOME_NT):HOME_CLUB}
 const HOME_NEUTRAL={g:[1,1],sh:[1,1],cor:[1,1],cards:[1,1],elo:0};
 function teamLevel(D,tid,cup){const def=cup?.45:LEVEL_DEFAULT,d=D.teams[tid]&&D.teams[tid].dom;if(!d)return{f:def,n:'liga desconocida',known:false};const f=LEVELS[d.ut];return{f:f||def,n:d.n,known:!!f}}
 const TZ='America/Santiago';
@@ -1436,6 +1441,7 @@ function realFor(fx){
 /* ===================== Eliminación directa ===================== */
 function isCupFx(D,fx){return!!(fx&&fx.cut&&D&&D.ut&&fx.cut!==D.ut)||/Playoff/i.test((fx&&fx.comp)||'')}
 function compShort(fx){const c=String(fx.comp||'');if(/Clausura Playoffs/i.test(c))return'Playoffs del Clausura';if(/Apertura Playoffs/i.test(c))return'Playoffs del Apertura';
+  if(/Africa Cup of Nations/i.test(c)){const g=c.match(/Group\s+([A-Z0-9]+)/i);return(/Qualif/i.test(c)?'Eliminatorias Copa Africana':'Copa Africana')+(g?' · Grupo '+g[1]:'')}
   return c.replace(/^(UEFA|CONMEBOL)\s+/,'').replace(/,.*$/,'')}
 function koRoundLabel(fx){const s=String(fx.slug||'').toLowerCase();
   const M={'final':'Final','semifinals':'Semifinal','semifinal':'Semifinal','quarterfinals':'Cuartos de final','quarterfinal':'Cuartos de final','round-of-16':'Octavos de final','round-of-32':'Dieciseisavos de final','round-of-64':'Treintaidosavos de final','playoff':'Repechaje','playoffs':'Repechaje','knockout-round-playoffs':'Repechaje','knockout-phase-playoffs':'Repechaje'};
@@ -1443,7 +1449,7 @@ function koRoundLabel(fx){const s=String(fx.slug||'').toLowerCase();
 function koLegLabel(fx){return fx.leg1||fx.leg1p?'vuelta':fx.leg2?'ida':''}
 function fxCompLabel(D,fx){
   if(!fx.comp||(!isCupFx(D,fx)&&!fx.ko&&!D.euro))return(LEAGUE_LN[D.league]||D.leagueName||'')+(fx.r&&!D.single?` · ${D.roundWord||'Jornada'} ${fx.r}`:'');
-  const r=fx.ko?koRoundLabel(fx):'',l=fx.ko?koLegLabel(fx):'';
+  const r=fx.ko?koRoundLabel(fx):(fx.r&&D.euro&&!D.single?'Fecha '+fx.r:''),l=fx.ko?koLegLabel(fx):'';
   return[compShort(fx),[r,l?`(${l})`:''].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}
 /* Reglas por competición: ¿hay alargue si quedan empatados? ¿la final es en cancha neutral? */
 function koRules(D,fx){
@@ -1594,7 +1600,7 @@ function nlContextHTML(R){
     <div class="grid2">${one(fx.h.id,fx.h.name)}${one(fx.a.id,fx.a.name)}</div></details>`;
 }
 function blockNL(R){
-  const D=S.D,fx=R.fx;if(!D||!D.nt)return'';
+  const D=S.D,fx=R.fx;if(!D||!D.nt||isAfr(D)||(D.league!=='unl'&&D.ut!==10783))return'';
   const info=nlInfo(fx.grp),g=D.groups&&D.groups[fx.grp],nm=id=>(D.teams[id]&&D.teams[id].name)||(fx.h.id===id?fx.h.name:fx.a.id===id?fx.a.name:'Equipo');
   const ctx=nlContextHTML(R);
   const euro='Ganar el grupo sirve además de respaldo para la EURO 2028: los ganadores de grupo de la Nations League 2026-27 mejor ubicados que no se clasifiquen por la vía normal juegan el repechaje (de 2 a 4 cupos, según cuántos anfitriones usen sus plazas reservadas).';
@@ -1716,7 +1722,7 @@ function renderAnalysisInner(){
   if(D.nt){
     if(R.sqH&&R.sqA)notes.push(`Fuerza por plantel: promedio del Elo de club de los ${R.sqH.xi||R.sqA.xi?'titulares de la alineación':'11 jugadores con más minutos'}. ${fx.h.name} ${Math.round(R.sqH.elo)} (${R.sqH.ce} de ${R.sqH.n} jugadores con Elo de ClubElo), ${fx.a.name} ${Math.round(R.sqA.elo)} (${R.sqA.ce} de ${R.sqA.n}).${R.sqH.ce<R.sqH.n||R.sqA.ce<R.sqA.n?` Los clubes sin Elo se estiman por el nivel de su liga${loadElo()?'':' (importa los ratings desde clubelo.com para afinarlo)'}.`:''} En cancha neutral daría ${pct(R.nSplit.We)} de "ganar o empatar a medias" para ${fx.h.name}. Se combina 65% con este rating y 35% con los goles esperados de sus últimos partidos.${R.src==='mercado'?' Como importaste cuotas, los goles quedan anclados al mercado.':''}`);
     else if(R.src!=='mercado')notes.push('Partido de selecciones sin datos de club suficientes para medir la fuerza del plantel: se compara solo por sus últimos partidos, jugados contra rivales de nivel muy distinto. Extrae con "Datos de club" activado para esta liga, o importa las cuotas 1X2 y de goles para anclar la fuerza al mercado.');
-    notes.push(`Ventaja de local de la Nations League (fase de grupos 2022-25 con público y la edición en curso): ${R.src==='mercado'?'los goles ya la traen incluida desde el mercado; ':`goles ×${R.HA.g[0]} local y ×${R.HA.g[1]} visita; `}córners ×${R.HA.cor[0]} y ×${R.HA.cor[1]}; tarjetas ×${R.HA.cards[0]} y ×${R.HA.cards[1]}. En clubes la app usa goles ×1.06 / ×0.95, córners ×1.04 / ×0.96 y no ajusta tarjetas.`);
+    notes.push(`${isAfr(D)?'Ventaja de local de las eliminatorias de la Copa Africana (498 partidos desde 2019; el local se lleva el 60% de los puntos)':'Ventaja de local de la Nations League (fase de grupos 2022-25 con público y la edición en curso)'}: ${R.src==='mercado'?'los goles ya la traen incluida desde el mercado; ':`goles ×${R.HA.g[0]} local y ×${R.HA.g[1]} visita; `}córners ×${R.HA.cor[0]} y ×${R.HA.cor[1]}; tarjetas ×${R.HA.cards[0]} y ×${R.HA.cards[1]}. En clubes la app usa goles ×1.06 / ×0.95, córners ×1.04 / ×0.96 y no ajusta tarjetas.`);
   }
   if(R.src==='elo')notes.push(`Fuerza de los equipos según el Elo: ${fx.h.name} ${R.eH.elo}, ${fx.a.name} ${R.eA.elo} (probabilidad de ganar o empatar a medias del local: ${pct(R.eloS.We)}). Incluye las cuotas de resultado y goles para anclarla al mercado.`);
   if(R.cf)notes.push(`Corrección por calibración aplicada (${R.cf.n} partidos con fuente "${({mercado:'mercado',elo:'Elo',liga:'nivel de liga',modelo:'modelo',selecciones:'plantel de selecciones'})[R.src]}"): remates ×${R.cf.fSh.toFixed(2)}${R.src!=='mercado'?`, goles ×${R.cf.fG.toFixed(2)}`:''}${R.cf.fShare?`, reparto hacia el que más remata ${R.cf.fShare>=0?'+':''}${(R.cf.fShare*100).toFixed(1)} pts`:''}.`);
